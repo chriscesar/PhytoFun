@@ -89,8 +89,8 @@ left_join(df_phyto0, records, by="taxa_name") -> df_phyto
 df_phyto <- df_phyto %>% 
   relocate(valid_aphia_id, .before = taxa_name) %>% 
   relocate(valid_name, .before = taxa_name)
-write.csv(df_phyto,
-          file = "outputs/Phyto_2000_2025_Step2.csv", row.names = FALSE)
+# write.csv(df_phyto,
+#           file = "outputs/Phyto_2000_2025_Step2.csv", row.names = FALSE)
 saveRDS(df_phyto,
         file = "outputs/Phyto_2000_2025_Step2.Rdat")
 
@@ -137,16 +137,37 @@ dfcarb %>%
 df_phyto %>% 
   mutate(valid_aphia_id = as.character(valid_aphia_id)) %>% 
   left_join(dfcarb_summary, by="valid_aphia_id") %>% 
+  rename("taxa_reported" = "taxa_name") %>% 
+  relocate(taxa_reported, .after = last_col()) %>%
+  relocate(valid_aphia_id, .after = last_col()) %>%
+  relocate(valid_name, .after = last_col()) %>%
   relocate(cells_per_litre_millilitre, .after = last_col()) %>% 
   mutate(tot_mn_vol_um3 = mean_vol_per_cell_um3*cells_per_litre_millilitre,
          tot_md_vol_um3 = median_vol_per_cell_um3*cells_per_litre_millilitre,
          tot_mn_C_pgC = mean_C_per_cell_pgC*cells_per_litre_millilitre,
          tot_md_C_pgC = median_C_per_cell_pgC*cells_per_litre_millilitre
-         ) -> df_phyto
+         ) %>% 
+  dplyr::select(-c(sample_type,sample_collector_name, sample_status,
+                   analysis_amended_by, analysis_amended_date,url,authority,
+                   valid_authority, citation,lsid,match_type,
+                   modified)) %>% 
+  ungroup() -> df_phyto_out
 
-saveRDS(df_phyto, file = "outputs/Phyto_2000_2025_USE.Rdat")
-write.csv(df_phyto, file = "outputs/Phyto_2000_2025_USE.csv",row.names = FALSE)
+saveRDS(df_phyto_out, file = "outputs/Phyto_2000_2025_USE.Rdat")
+write.csv(df_phyto_out, file = "outputs/Phyto_2000_2025_USE.csv",row.names = FALSE)
 
 toc(log=TRUE)
 
 unlist(tictoc::tic.log())
+ 
+# Tidy up ####
+rm(list=ls(pattern = "^df"))
+rm(list=ls(pattern = "^recor"))
+rm(list=ls(pattern = "^aph"))
+rm(blankAPHIA,unique_names)
+
+detach("package:tidyverse", unload=TRUE)
+detach("package:tidyr", unload=TRUE)
+detach("package:purrr", unload=TRUE)
+detach("package:tictoc", unload=TRUE)
+detach("package:worrms", unload=TRUE)
