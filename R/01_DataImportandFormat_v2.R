@@ -87,8 +87,10 @@ toc(log=TRUE)
 tic("Merge to abundance data & write")
 left_join(df_phyto0, records, by="taxa_name") -> df_phyto
 df_phyto <- df_phyto %>% 
+  mutate(name_use = coalesce(valid_name, taxa_name)) %>% 
   relocate(valid_aphia_id, .before = taxa_name) %>% 
-  relocate(valid_name, .before = taxa_name)
+  relocate(valid_name, .before = taxa_name) %>% 
+  relocate(name_use, .before = valid_name)
 # write.csv(df_phyto,
 #           file = "outputs/Phyto_2000_2025_Step2.csv", row.names = FALSE)
 saveRDS(df_phyto,
@@ -141,6 +143,7 @@ df_phyto %>%
   relocate(taxa_reported, .after = last_col()) %>%
   relocate(valid_aphia_id, .after = last_col()) %>%
   relocate(valid_name, .after = last_col()) %>%
+  relocate(name_use, .after = last_col()) %>%
   relocate(cells_per_litre_millilitre, .after = last_col()) %>% 
   mutate(tot_mn_vol_um3 = mean_vol_per_cell_um3*cells_per_litre_millilitre,
          tot_md_vol_um3 = median_vol_per_cell_um3*cells_per_litre_millilitre,
@@ -159,7 +162,7 @@ write.csv(df_phyto_out, file = "outputs/Phyto_2000_2025_USE.csv",row.names = FAL
 toc(log=TRUE)
 
 unlist(tictoc::tic.log())
- 
+
 # Tidy up ####
 rm(list=ls(pattern = "^df"))
 rm(list=ls(pattern = "^recor"))
