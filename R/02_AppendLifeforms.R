@@ -16,6 +16,41 @@ tic("Load data")
 # Load TS data created in 01_DataImportandFormat_v2.R
 df0 <- readRDS("outputs/Phyto_2000_2025_USE.Rdat")
 
+df0$sample_dateTime <- df0$sample_date
+x <- substr(df0$sample_date,1,10)
+x %>% as_tibble()-> x#mutate()
+x %>% mutate(date = as.Date(value,)) ->y
+df0$sample_date <- y$date
+
+df0 %>%
+  relocate(sample_dateTime,.after = sample_time) %>%
+  relocate(sample_date) %>% 
+  relocate(site_id) %>% 
+  relocate(wb_name) %>% 
+  relocate(river_basi) %>% 
+  arrange(river_basi, wb_name, site_id, sample_date)  -> df0
+rm(x,y)
+
+tic("extract Biosys code from site_station_name")
+## extract BIOSYS codes from site_station_name
+# extract Biosys code from site_station_name ###
+site_station_name <- unique(df0$site_station_name)
+biosys_code <- str_extract(site_station_name, "[A-Z]{3}[0-9]{3}[A-Z]")
+# regular expression to extract sections of text with:
+# [A-Z]{3} EXACTLY 3 upper case letters (e.g. 'SOL'), followed by
+# [0-9]{3} EXACTLY 3 digits (e.g. 001)
+# [A-Z] exactly 1 upper case letter (e.g. P)
+# example: SOL001P
+biosys_codes <- data.frame(site_station_name,biosys_code)
+
+df0 %>% 
+  left_join(biosys_codes, by="site_station_name") %>%
+  relocate(biosys_code, .after = site_id) -> df0
+
+rm(biosys_codes,biosys_code, site_station_name)
+toc(log=TRUE)
+
+tic("Append lifeforms")
 # Load lifeforms table
 dflf <- readxl::read_xlsx("data/Masterlist-V7_working_EDIT_CC.xlsx",
                           sheet = "SpeciesInfoUSE") %>% 
