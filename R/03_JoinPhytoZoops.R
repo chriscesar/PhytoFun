@@ -116,7 +116,9 @@ zooptrm <- dfzoop %>% dplyr::select(
     md_carb_tot,md_carb_tot_units,
     mn_size,mn_size_units,
     md_size,md_size_units
-    )
+    ) %>% 
+  # convert all variables to character to allow easier joining
+  mutate(across(everything(), as.character))
 
 ## Prep phyto data ####
 # retain 'sensible' variables
@@ -185,9 +187,39 @@ phytotrm <- dfphyto_trm %>% dplyr::select(
     md_carb_tot,md_carb_tot_units,
     mn_size,mn_size_units,
     md_size,md_size_units
-  )
+  ) %>% 
+  # convert all variables to character to allow easier joining
+  mutate(across(everything(), as.character))
 
 ## check names match
 table(names(zooptrm) == names(phytotrm))
 toc(log=TRUE)
 
+tic("Bind zoops and phyto to single df and export")
+# Bind zoops and phyto to single df and export ####
+dfall <- bind_rows(zooptrm,phytotrm) %>% 
+  mutate(sample_date = as.Date(sample_date),
+         abundance = as.numeric(abundance),
+         mn_carb_tot = as.numeric(mn_carb_tot),
+         md_carb_tot = as.numeric(md_carb_tot),
+         mn_size = as.numeric(mn_size),
+         md_size = as.numeric(md_size)
+         )
+
+# save data
+saveRDS(dfall, file = "outputs/ZoopPhytoMatchingBIOSYS.Rdat")
+write.csv(dfall, file = "outputs/ZoopPhytoMatchingBIOSYS.csv", row.names = FALSE)
+toc(log=TRUE)
+
+unlist(tictoc::tic.log())
+
+# Tidy up ####
+rm(list = ls(pattern = "^df"))
+rm(list = ls(pattern = "^cb"))
+rm(phytotrm, zooptrm, theme_use,ppi, zoopfol)
+
+detach("package:tidyverse", unload=TRUE)
+detach("package:tidyr", unload=TRUE)
+detach("package:tictoc", unload=TRUE)
+detach("package:janitor", unload=TRUE)
+detach("package:stringr", unload=TRUE)
