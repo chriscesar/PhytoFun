@@ -23,6 +23,10 @@ dfzoop <- read.csv((paste0(zoopfol,"processedData/zoopsAll.csv"))) %>%
     )
 dfzoop$DataSet <- "Zooplankton"
 
+zoop_meta <- readxl::read_xlsx(paste0(zoopfol,
+                                      "processedData/MBA_Returns_Amalgamated_USE.xlsx"),
+                               sheet = "SiteMeta")
+
 ## phyto
 dfphyto <- readRDS(file="outputs/Phyto_2000_2025_with_Lifeforms_USE.Rdat") %>% 
   mutate(Biosys_short = if_else(
@@ -70,8 +74,8 @@ zooptrm <- dfzoop %>% dplyr::select(
   # create 'units' variables as zoops and phyto differ
   dplyr::mutate(
     Abund_m3_units = "Count_per_m3",
-    mn_carbTot_m3_units = "tot_C_m3",
-    md_carbTot_m3_units = "tot_C_m3",
+    mn_carbTot_m3_units = "ugC_per_m3",
+    md_carbTot_m3_units = "ugC_per_m3",
     mnCPerIndiv_ug_units = "ug",
     mdCPerIndiv_ug_units = "ug",
     mnlongMaxAxis_mm_units = "mm",
@@ -139,19 +143,19 @@ phytotrm <- dfphyto_trm %>% dplyr::select(
   family,
   genus,
   cells_per_litre_millilitre,
-  tot_mn_c_pg_c,
-  tot_md_c_pg_c,
+  tot_mn_c_pg_c_per_l,
+  tot_md_c_pg_c_per_l,
   mean_vol_per_cell_um3,
   median_vol_per_cell_um3
   ) %>% 
   # create 'units' variables as zoops and phyto differ
   dplyr::mutate(
     cells_per_litre_millilitre_units = "cells_per_litre",
-    tot_mn_c_pg_c_units = "pg_C",
-    tot_md_c_pg_c_units = "pg_C",
+    tot_mn_c_pg_c_per_l_units = "pg_C_per_l",
+    tot_md_c_pg_c_per_l_units = "pg_C_per_l",
     mean_vol_per_cell_um3_units = "volume_um3",
     median_vol_per_cell_um3_units = "volume_um3"
-  ) %>% 
+  ) %>% #View(.)
   # rename for consistency
   dplyr::rename(
     sample_date = sample_date,
@@ -163,17 +167,17 @@ phytotrm <- dfphyto_trm %>% dplyr::select(
     wb = wb_name,
     lifeform = phytoplankton_type,
     Abundance = cells_per_litre_millilitre,
-    mnCarbTot = tot_mn_c_pg_c,
-    mdCarbTot = tot_md_c_pg_c,
+    mnCarbTot = tot_mn_c_pg_c_per_l,
+    mdCarbTot = tot_md_c_pg_c_per_l,
     mnSize = mean_vol_per_cell_um3,
     mdSize = median_vol_per_cell_um3,
     abundance_units = cells_per_litre_millilitre_units,
-    mn_carb_tot_units = tot_mn_c_pg_c_units,
-    md_carb_tot_units = tot_md_c_pg_c_units,
+    mn_carb_tot_units = tot_mn_c_pg_c_per_l_units,
+    md_carb_tot_units = tot_md_c_pg_c_per_l_units,
     
     mnSize_units = mean_vol_per_cell_um3_units,
     mdSize_units = median_vol_per_cell_um3_units
-    ) %>% janitor::clean_names(.) %>% 
+    ) %>% janitor::clean_names(.) %>% #View(.)
   ## reorder columns to match
   dplyr::select(
     region,wb_id,wb,biosys_short,
@@ -206,6 +210,26 @@ dfall <- bind_rows(zooptrm,phytotrm) %>%
          md_size = as.numeric(md_size)
          )
 
+# homogenise region names and wb names ####
+unique(dfall$region)
+
+zoop_meta %>%
+  mutate(biosys_short = substr(BIOSYS_ID, 1, nchar(BIOSYS_ID) - 1)) -> zoop_meta
+  
+dfall %>% left_join(.,zoop_meta, by = "biosys_short") %>% 
+  dplyr::select(-c(region:wb)) %>% #->d#%>% 
+  dplyr::rename(
+    region = RBID,
+    wb_id = WBID,
+    wb = WBName,
+    wb_type = Type
+  ) %>% 
+  dplyr::relocate(wb_type) %>% 
+  dplyr::relocate(wb) %>% 
+  dplyr::relocate(wb_id) %>% 
+  dplyr::relocate(region) %>% 
+  dplyr::select(.,-c(WIMS:BIOSYS_ID)) -> dfall
+  
 # save data
 saveRDS(dfall, file = "outputs/ZoopPhytoMatchingBIOSYS.Rdat")
 write.csv(dfall, file = "outputs/ZoopPhytoMatchingBIOSYS.csv", row.names = FALSE)
@@ -216,7 +240,7 @@ unlist(tictoc::tic.log())
 # Tidy up ####
 rm(list = ls(pattern = "^df"))
 rm(list = ls(pattern = "^cb"))
-rm(phytotrm, zooptrm, theme_use,ppi, zoopfol)
+rm(phytotrm, zooptrm, theme_use,ppi, zoopfol, zoop_meta)
 
 detach("package:tidyverse", unload=TRUE)
 detach("package:tidyr", unload=TRUE)
