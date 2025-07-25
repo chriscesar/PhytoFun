@@ -100,7 +100,7 @@ dfcarb %>%
       NA_character_
     ),
     `Carbon per cell (pgC)` = as.numeric(`Carbon per cell (pgC)`)) %>% 
-  group_by(valid_aphia_id) %>%
+  group_by(valid_aphia_id, Taxon, `Major Group`) %>%
   summarise(mean_vol_per_cell_um3=mean(as.numeric(`Volume per cell (µm3)`),
                                        na.rm = TRUE),
             median_vol_per_cell_um3=median(as.numeric(`Volume per cell (µm3)`),
@@ -108,23 +108,24 @@ dfcarb %>%
             mean_C_per_cell_pgC=mean(as.numeric(`Carbon per cell (pgC)`),
                                      na.rm = TRUE),
             median_C_per_cell_pgC=median(as.numeric(`Carbon per cell (pgC)`),
-                                         na.rm = TRUE)
+                                         na.rm = TRUE),
+            .groups = "drop"
   ) %>% ungroup() -> dfcarb_summary
-
-df %>% 
-  dplyr::select(valid_aphia_id,name_use, size_class:protozoa_feeding) %>% 
-  count(pick(everything())) -> taxon_data
-  
-write.csv(taxon_data, file = "outputs/phyto_taxon_data.csv",
-          row.names = FALSE)
-saveRDS(taxon_data, file = "outputs/phyto_taxon_data.Rdat")
+write.csv(dfcarb_summary, file = "outputs/dfcarbsummary.csv",row.names = FALSE)
+# df %>% 
+#   dplyr::select(valid_aphia_id,name_use, size_class:protozoa_feeding) %>% 
+#   count(pick(everything())) -> taxon_data
+#   
+# write.csv(taxon_data, file = "outputs/phyto_taxon_data.csv",
+#           row.names = FALSE)
+# saveRDS(taxon_data, file = "outputs/phyto_taxon_data.Rdat")
 toc(log = TRUE)
 
 unlist(tictoc::tic.log())
 
 # Tidy up ####
 rm(list = ls(pattern = "^df"))
-rm(taxon_data)
+#rm(taxon_data)
 
 detach("package:tidyverse", unload=TRUE)
 detach("package:tidyr", unload=TRUE)
