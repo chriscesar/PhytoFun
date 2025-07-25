@@ -134,8 +134,7 @@ dfcarb %>%
                                            na.rm = TRUE)
               ) %>% ungroup() -> dfcarb_summary
 
-# Join carbon data to phyto data and multiply by per cell values
-
+## Join carbon data to phyto data and multiply by per cell values ####
 df_phyto %>% 
   mutate(valid_aphia_id = as.character(valid_aphia_id)) %>% 
   left_join(dfcarb_summary, by="valid_aphia_id") %>% 
@@ -147,8 +146,8 @@ df_phyto %>%
   relocate(cells_per_litre_millilitre, .after = last_col()) %>% 
   mutate(tot_mn_vol_um3 = mean_vol_per_cell_um3*cells_per_litre_millilitre,
          tot_md_vol_um3 = median_vol_per_cell_um3*cells_per_litre_millilitre,
-         tot_mn_C_pgC = mean_C_per_cell_pgC*cells_per_litre_millilitre,
-         tot_md_C_pgC = median_C_per_cell_pgC*cells_per_litre_millilitre
+         tot_mn_C_pgC_per_l = mean_C_per_cell_pgC*cells_per_litre_millilitre,
+         tot_md_C_pgC_per_l = median_C_per_cell_pgC*cells_per_litre_millilitre
          ) %>% 
   dplyr::select(-c(sample_type,sample_collector_name, sample_status,
                    analysis_amended_by, analysis_amended_date,url,authority,
@@ -161,13 +160,37 @@ write.csv(df_phyto_out, file = "outputs/Phyto_2000_2025_USE.csv",row.names = FAL
 
 toc(log=TRUE)
 
+tic("Taxon summary")
+## create summary of which taxa do/do not have carbon values associated with them ####
+df_phyto_out %>% 
+  dplyr::select(
+    c(
+      valid_aphia_id, name_use,cells_per_litre_millilitre,
+      kingdom,phylum,class, order, family, genus,
+      mean_vol_per_cell_um3, median_vol_per_cell_um3,
+      mean_C_per_cell_pgC, median_C_per_cell_pgC
+    )
+  ) %>% 
+  group_by(valid_aphia_id,name_use) %>% 
+  summarise(n=n(),
+            mean_cells_l = mean(cells_per_litre_millilitre, na.rm=TRUE),
+            mean_vol_per_cell_um3 = mean(mean_vol_per_cell_um3,na.rm = TRUE),
+            median_vol_per_cell_um3 = mean(median_vol_per_cell_um3,na.rm = TRUE),
+            mean_C_per_cell_pgC = mean(mean_C_per_cell_pgC,na.rm = TRUE),
+            median_C_per_cell_pgC = mean(median_C_per_cell_pgC,na.rm = TRUE),
+            .groups = "drop") -> taxon_data
+write.csv(taxon_data, file = "outputs/phyto_taxon_data.csv",
+          row.names = FALSE)
+saveRDS(taxon_data, file = "outputs/phyto_taxon_data.Rdat")
+toc(log=TRUE)
+
 unlist(tictoc::tic.log())
 
 # Tidy up ####
 rm(list=ls(pattern = "^df"))
 rm(list=ls(pattern = "^recor"))
 rm(list=ls(pattern = "^aph"))
-rm(blankAPHIA,unique_names)
+rm(blankAPHIA,unique_names,taxon_data)
 
 detach("package:tidyverse", unload=TRUE)
 detach("package:tidyr", unload=TRUE)
