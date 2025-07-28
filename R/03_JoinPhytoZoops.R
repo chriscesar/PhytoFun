@@ -29,6 +29,7 @@ zoop_meta <- readxl::read_xlsx(paste0(zoopfol,
 
 ## phyto
 dfphyto <- readRDS(file="outputs/Phyto_2000_2025_with_Lifeforms_USE.Rdat") %>% 
+  # created in script '02_AppendLifeforms.R'
   mutate(Biosys_short = if_else(
     is.na(biosys_code),
     NA_character_,
