@@ -100,39 +100,42 @@ toc(log = TRUE)
 
 # Import and incorporate carbon data ####
 tic("Import and incorporate carbon data")
-dfcarb <- readxl::read_xlsx("data/Phyto carbon PML and EA_v7 Feb 2025.xlsx",
-                            sheet = 1)
-dfcarb %>% rename("valid_aphia_id" = `Aphia ID`) -> dfcarb
+# dfcarb <- readxl::read_xlsx("data/Phyto carbon PML and EA_v7 Feb 2025.xlsx",
+#                             sheet = 1)
+## load new & improved summary with filled in blanks
+dfcarb_summary <- readxl::read_xlsx("data/PhytoCarbon_blankFill.xlsx",
+                                    sheet = "out")
+# dfcarb_summary %>% rename("valid_aphia_id" = `Aphia ID`) -> dfcarb_summary
 
 # Generate mean and median values for taxa with multiple estimates
-dfcarb %>% 
-  mutate(
-    `Volume per cell (µm3)` = str_replace(`Volume per cell (µm3)`, ",", "."), # optional: handle decimal commas
-    `Volume per cell (µm3)` = if_else(
-      str_detect(`Volume per cell (µm3)`, "^-?\\d*\\.?\\d+$"),
-      `Volume per cell (µm3)`,
-      NA_character_
-    ),
-    `Volume per cell (µm3)` = as.numeric(`Volume per cell (µm3)`)
-    ) %>% 
-  mutate(
-  `Carbon per cell (pgC)` = str_replace(`Carbon per cell (pgC)`, ",", "."), # optional: handle decimal commas
-`Carbon per cell (pgC)` = if_else(
-  str_detect(`Carbon per cell (pgC)`, "^-?\\d*\\.?\\d+$"),
-  `Carbon per cell (pgC)`,
-  NA_character_
-  ),
-`Carbon per cell (pgC)` = as.numeric(`Carbon per cell (pgC)`)) %>% 
-    group_by(valid_aphia_id) %>%
-    summarise(mean_vol_per_cell_um3=mean(as.numeric(`Volume per cell (µm3)`),
-                                         na.rm = TRUE),
-              median_vol_per_cell_um3=median(as.numeric(`Volume per cell (µm3)`),
-                                             na.rm = TRUE),
-              mean_C_per_cell_pgC=mean(as.numeric(`Carbon per cell (pgC)`),
-                                       na.rm = TRUE),
-              median_C_per_cell_pgC=median(as.numeric(`Carbon per cell (pgC)`),
-                                           na.rm = TRUE)
-              ) %>% ungroup() -> dfcarb_summary
+# dfcarb %>% 
+#   mutate(
+#     `Volume per cell (µm3)` = str_replace(`Volume per cell (µm3)`, ",", "."), # optional: handle decimal commas
+#     `Volume per cell (µm3)` = if_else(
+#       str_detect(`Volume per cell (µm3)`, "^-?\\d*\\.?\\d+$"),
+#       `Volume per cell (µm3)`,
+#       NA_character_
+#     ),
+#     `Volume per cell (µm3)` = as.numeric(`Volume per cell (µm3)`)
+#     ) %>% 
+#   mutate(
+#   `Carbon per cell (pgC)` = str_replace(`Carbon per cell (pgC)`, ",", "."), # optional: handle decimal commas
+# `Carbon per cell (pgC)` = if_else(
+#   str_detect(`Carbon per cell (pgC)`, "^-?\\d*\\.?\\d+$"),
+#   `Carbon per cell (pgC)`,
+#   NA_character_
+#   ),
+# `Carbon per cell (pgC)` = as.numeric(`Carbon per cell (pgC)`)) %>% 
+#     group_by(valid_aphia_id) %>%
+#     summarise(mean_vol_per_cell_um3=mean(as.numeric(`Volume per cell (µm3)`),
+#                                          na.rm = TRUE),
+#               median_vol_per_cell_um3=median(as.numeric(`Volume per cell (µm3)`),
+#                                              na.rm = TRUE),
+#               mean_C_per_cell_pgC=mean(as.numeric(`Carbon per cell (pgC)`),
+#                                        na.rm = TRUE),
+#               median_C_per_cell_pgC=median(as.numeric(`Carbon per cell (pgC)`),
+#                                            na.rm = TRUE)
+#               ) %>% ungroup() -> dfcarb_summary
 
 ## Join carbon data to phyto data and multiply by per cell values ####
 df_phyto %>% 
@@ -144,6 +147,12 @@ df_phyto %>%
   relocate(valid_name, .after = last_col()) %>%
   relocate(name_use, .after = last_col()) %>%
   relocate(cells_per_litre_millilitre, .after = last_col()) %>% 
+  mutate(mean_vol_per_cell_um3 = as.numeric(mean_vol_per_cell_um3_use),
+         median_vol_per_cell_um3 = as.numeric(median_vol_per_cell_um3_use),
+         mean_C_per_cell_pgC = as.numeric(mean_C_per_cell_pgC_use),
+         median_C_per_cell_pgC = as.numeric(median_C_per_cell_pgC_use)) %>% 
+  dplyr::select(-c(mean_vol_per_cell_um3_use,median_vol_per_cell_um3_use,
+                   mean_C_per_cell_pgC_use, median_C_per_cell_pgC_use)) %>% 
   mutate(tot_mn_vol_um3 = mean_vol_per_cell_um3*cells_per_litre_millilitre,
          tot_md_vol_um3 = median_vol_per_cell_um3*cells_per_litre_millilitre,
          tot_mn_C_pgC_per_l = mean_C_per_cell_pgC*cells_per_litre_millilitre,
@@ -160,29 +169,29 @@ write.csv(df_phyto_out, file = "outputs/Phyto_2000_2025_USE.csv",row.names = FAL
 
 toc(log=TRUE)
 
-tic("Taxon summary")
-## create summary of which taxa do/do not have carbon values associated with them ####
-df_phyto_out %>% 
-  dplyr::select(
-    c(
-      valid_aphia_id, name_use,cells_per_litre_millilitre,
-      kingdom,phylum,class, order, family, genus,
-      mean_vol_per_cell_um3, median_vol_per_cell_um3,
-      mean_C_per_cell_pgC, median_C_per_cell_pgC
-    )
-  ) %>% 
-  group_by(valid_aphia_id,name_use) %>% 
-  summarise(n=n(),
-            mean_cells_l = mean(cells_per_litre_millilitre, na.rm=TRUE),
-            mean_vol_per_cell_um3 = mean(mean_vol_per_cell_um3,na.rm = TRUE),
-            median_vol_per_cell_um3 = mean(median_vol_per_cell_um3,na.rm = TRUE),
-            mean_C_per_cell_pgC = mean(mean_C_per_cell_pgC,na.rm = TRUE),
-            median_C_per_cell_pgC = mean(median_C_per_cell_pgC,na.rm = TRUE),
-            .groups = "drop") -> taxon_data
-write.csv(taxon_data, file = "outputs/phyto_taxon_data.csv",
-          row.names = FALSE)
-saveRDS(taxon_data, file = "outputs/phyto_taxon_data.Rdat")
-toc(log=TRUE)
+# tic("Taxon summary")
+# ## create summary of which taxa do/do not have carbon values associated with them ####
+# df_phyto_out %>% 
+#   dplyr::select(
+#     c(
+#       valid_aphia_id, name_use,cells_per_litre_millilitre,
+#       kingdom,phylum,class, order, family, genus,
+#       mean_vol_per_cell_um3, median_vol_per_cell_um3,
+#       mean_C_per_cell_pgC, median_C_per_cell_pgC
+#     )
+#   ) %>% 
+#   group_by(valid_aphia_id,name_use) %>% 
+#   summarise(n=n(),
+#             mean_cells_l = mean(cells_per_litre_millilitre, na.rm=TRUE),
+#             mean_vol_per_cell_um3 = mean(mean_vol_per_cell_um3,na.rm = TRUE),
+#             median_vol_per_cell_um3 = mean(median_vol_per_cell_um3,na.rm = TRUE),
+#             mean_C_per_cell_pgC = mean(mean_C_per_cell_pgC,na.rm = TRUE),
+#             median_C_per_cell_pgC = mean(median_C_per_cell_pgC,na.rm = TRUE),
+#             .groups = "drop") -> taxon_data
+# write.csv(taxon_data, file = "outputs/phyto_taxon_data.csv",
+#           row.names = FALSE)
+# saveRDS(taxon_data, file = "outputs/phyto_taxon_data.Rdat")
+# toc(log=TRUE)
 
 unlist(tictoc::tic.log())
 
