@@ -30,6 +30,7 @@ df0 %>%
   relocate(river_basi) %>% 
   arrange(river_basi, wb_name, site_id, sample_date)  -> df0
 rm(x,y)
+toc(log=TRUE)
 
 tic("extract Biosys code from site_station_name")
 ## extract BIOSYS codes from site_station_name
