@@ -37,5 +37,7 @@ Incorporating phytoplankton abundances and carbon contents.
 
 * ~Check conversions in zooplankton and phytoplankton abundances~
 * ~Check 'missing' taxa for carbon values.  Can we use congeners/parent taxa values?~
-* Update script to incorporate amended carbon values
-* Clean code into a single script
+* ~Update script '01_....' to incorporate amended carbon values~
+* ~Update/sense check subsequent scripts to ensure no errors~
+* Apparent under-estimation of phyto carbon (or OVER-estimation of zoops)
+* ?Clean code into a single script?
