@@ -76,7 +76,7 @@ dfall_use %>%
             mn_carb_tot_ugC_m3 = sum(mn_carb_tot_ugC_m3, na.rm = TRUE),
             md_carb_tot_ugC_m3 = sum(md_carb_tot_ugC_m3, na.rm = TRUE)) %>% 
   ggplot(., aes(x = sample_date,
-                y = log(mn_carb_tot_ugC_m3),
+                y = log10(mn_carb_tot_ugC_m3+1),
                 colour = data_set
                 )) +
   geom_point() +
@@ -131,30 +131,38 @@ dfall_use %>%
       region,
       "Northumbria", "Humber", "Anglian", "Thames",
       "South East","South West","North West")) %>%
+  dplyr::mutate(rgn_wb = paste0(region,": ",wb)) %>% 
   dplyr::select(-c(
     lifeform,
     abundance, abundance_units,
     #abundance_m3,
     mn_carb_tot, mn_carb_tot_units,
     md_carb_tot, md_carb_tot_units,
-    mn_size,mn_size_units,md_size,md_size_units)) %>% 
+    mn_size,mn_size_units,md_size,md_size_units,
+    aphia_id,taxon
+    )) %>% 
   dplyr::filter(sample_date > "2022-06-01") %>% 
   group_by(across(c(-abundance_m3, -mn_carb_tot_ugC_m3,-md_carb_tot_ugC_m3))) %>% 
   summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
             mn_carb_tot_ugC_m3 = sum(mn_carb_tot_ugC_m3,na.rm = TRUE),
             md_carb_tot_ugC_m3 = sum(md_carb_tot_ugC_m3, na.rm = TRUE)) %>% 
   ggplot(., aes(x = sample_date,
-                y = log10(mn_carb_tot_ugC_m3),
-                colour = data_set
+                y = log10(mn_carb_tot_ugC_m3+1),
+                fill = data_set,
+                shape = data_set
   )) +
   geom_point() +
-  geom_smooth()+
-  facet_wrap(.~region, scale = "free_y") +
+  scale_shape_manual(values = c(21,24))+
+  scale_fill_manual(values=c("green","blue"))+
+  geom_smooth(se=FALSE, aes(colour = data_set))+
+  scale_colour_manual(values=c("green","blue"))+
+  facet_wrap(.~rgn_wb, scale = "free_y") +
   labs(title = "Estimated carbon content in phytoplankton and zooplankton populations")+
   xlab("Date")+
-  ylab("log10(Carbon content)")+
+  ylab("log10(Carbon content +1)")+
   theme(
     axis.title = element_text(face=2),
-    strip.text = element_text(face=2)
+    strip.text = element_text(face=2),
+    legend.title = element_blank()
   )
 
