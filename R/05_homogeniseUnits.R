@@ -57,7 +57,15 @@ dfall_use <- dfall %>%
     )
   ) %>% 
   dplyr::relocate(mn_carb_tot_ugC_m3, .after = mn_carb_tot_units) %>% 
-  dplyr::relocate(md_carb_tot_ugC_m3, .after = md_carb_tot_units)
+  dplyr::relocate(md_carb_tot_ugC_m3, .after = md_carb_tot_units) %>% 
+  # Turn Region into a factor
+  dplyr::mutate(region = factor(region,
+                                levels = c(
+                                  "Northumbria","Humber",
+                                  "Anglian","Thames",
+                                  "South East","South West",
+                                  "North West"
+                                )))
 toc(log=TRUE)
 
 # Plots ####
@@ -74,12 +82,17 @@ dfall_use %>%
   group_by(across(c(-abundance_m3, -mn_carb_tot_ugC_m3,-md_carb_tot_ugC_m3))) %>% 
   summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
             mn_carb_tot_ugC_m3 = sum(mn_carb_tot_ugC_m3, na.rm = TRUE),
-            md_carb_tot_ugC_m3 = sum(md_carb_tot_ugC_m3, na.rm = TRUE)) %>% 
+            md_carb_tot_ugC_m3 = sum(md_carb_tot_ugC_m3, na.rm = TRUE),
+            .groups = "drop") %>% 
   ggplot(., aes(x = sample_date,
                 y = log10(mn_carb_tot_ugC_m3+1),
-                colour = data_set
+                # colour = data_set,
+                shape = data_set,
+                fill = data_set
                 )) +
   geom_point() +
+  scale_fill_manual(values=c("green","blue"))+
+  scale_shape_manual(values = c(21,24))+
   facet_wrap(.~region)
 
 ## show 'missing' carbon abundances ####
@@ -91,6 +104,7 @@ dfall_use %>%
     md_carb_tot, md_carb_tot_units,
     mn_size,mn_size_units,md_size,md_size_units)) %>% 
   dplyr::filter(sample_date > "2022-06-01") %>% 
+  dplyr::mutate(yday = lubridate::yday(sample_date)) %>% 
   # group_by(across(c(-abundance_m3, -mn_carb_tot_ugC_m3,-md_carb_tot_ugC_m3))) %>% 
   # summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
   #           mn_carb_tot_ugC_m3 = sum(mn_carb_tot_ugC_m3, na.rm = TRUE),
@@ -98,11 +112,13 @@ dfall_use %>%
   ## create flag to ID whether or not the taxon has Carbon estimates
   dplyr::mutate(flag = ifelse(is.na(mn_carb_tot_ugC_m3),"No carbon estimate","Carbon estimate")) %>%
   dplyr::mutate(flag2 = paste0(data_set,"_",flag)) %>% #View(.)
-  ggplot(., aes(x = sample_date,
-                y = log10(abundance_m3),
-                colour = flag2,
-                fill = flag2,
-                shape = flag2
+  ggplot(., aes(
+    x = sample_date,
+    # x = yday,
+    y = log10(abundance_m3),
+    colour = flag2,
+    fill = flag2,
+    shape = flag2
   )) +
   # geom_point(pch = 21) +
   geom_jitter(
@@ -141,22 +157,66 @@ dfall_use %>%
     mn_size,mn_size_units,md_size,md_size_units,
     aphia_id,taxon
     )) %>% 
-  dplyr::filter(sample_date > "2022-06-01") %>% 
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  ## sense check
+  # dplyr::filter(biosys_short == "SOL001") %>%
+  # dplyr::filter(sample_date == "2024-02-02") %>% #View(.)
   group_by(across(c(-abundance_m3, -mn_carb_tot_ugC_m3,-md_carb_tot_ugC_m3))) %>% 
   summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
             mn_carb_tot_ugC_m3 = sum(mn_carb_tot_ugC_m3,na.rm = TRUE),
-            md_carb_tot_ugC_m3 = sum(md_carb_tot_ugC_m3, na.rm = TRUE)) %>% 
-  ggplot(., aes(x = sample_date,
-                y = log10(mn_carb_tot_ugC_m3+1),
-                fill = data_set,
-                shape = data_set
-  )) +
+            md_carb_tot_ugC_m3 = sum(md_carb_tot_ugC_m3, na.rm = TRUE),
+            .groups = "drop") %>% #View()
+  dplyr::mutate(yday = lubridate::yday(sample_date)) %>% 
+  ## reorder sites by region
+  dplyr::mutate(biosys_short = factor(biosys_short,
+                                      levels = unique(biosys_short[order(region)])
+                                      )
+                ) %>% 
+  ## create label variable
+  dplyr::mutate(regn_wb_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb))) %>%
+  dplyr::mutate(regn_wb_biosys_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb),
+                                     "_",
+                                     biosys_short)) %>%
+  dplyr::mutate(regn_wb_lbl = factor(regn_wb_lbl,
+                                      levels = unique(regn_wb_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::mutate(regn_wb_biosys_lbl = factor(regn_wb_biosys_lbl,
+                                      levels = unique(regn_wb_biosys_lbl[order(region)])
+  )
+  ) %>% 
+  ggplot(., aes(
+    # x = yday,
+    x = sample_date,
+    y = log10(mn_carb_tot_ugC_m3+1),
+    fill = data_set,
+    shape = data_set
+                )) +
   geom_point() +
   scale_shape_manual(values = c(21,24))+
   scale_fill_manual(values=c("green","blue"))+
-  geom_smooth(se=FALSE, aes(colour = data_set))+
+  geom_smooth(method = "loess", se=FALSE, aes(colour = data_set))+
   scale_colour_manual(values=c("green","blue"))+
-  facet_wrap(.~rgn_wb, scale = "free_y") +
+  facet_wrap(.~regn_wb_biosys_lbl, scale = "free_y") +
+  # ggh4x::facet_wrap2(
+  #   ~biosys_short,
+  #   strip = ggh4x::strip_themed(
+  #     background_x = list(
+  #       region == "Northumbria"~element_rect(fill = "lightblue"),
+  #       region == "Humber"~element_rect(fill = "orange"),
+  #       region == "Anglian"~element_rect(fill = "lightgreen"),
+  #       region == "Thames"~element_rect(fill = "pink"),
+  #       region == "South East"~element_rect(fill = "sienna"),
+  #       region == "South West"~element_rect(fill = "grey"),
+  #       region == "North West"~element_rect(fill = "purple"),
+  #       TRUE~element_rect(fill="grey90")
+  #       )
+  #     )
+  #   )+
   labs(title = "Estimated carbon content in phytoplankton and zooplankton populations")+
   xlab("Date")+
   ylab("log10(Carbon content +1)")+
