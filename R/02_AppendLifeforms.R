@@ -60,7 +60,8 @@ dflf <- readxl::read_xlsx("data/Masterlist-V7_working_EDIT_CC.xlsx",
   dplyr::select(AphiaID, SizeClass, "QA Flag", PlanktonType,
                 PhytoplanktonType, PhytoplanktonSize, PhytoDepth,
                 PhytoFeedingMech, Toxic_Nuisance, PhytoHabitat,
-                ProtozoaType, ProtozoaSize,ProtozoaHabitat,ProtozoaFeeding) %>% 
+                ProtozoaType, ProtozoaSize,ProtozoaHabitat,ProtozoaFeeding,
+                PhytoLF) %>% 
   dplyr::rename("valid_aphia_id" = "AphiaID") %>% 
   mutate(valid_aphia_id = as.character(valid_aphia_id))
 
