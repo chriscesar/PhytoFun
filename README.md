@@ -30,8 +30,12 @@ Incorporating phytoplankton abundances and carbon contents.
     + Loads phyto data generated in '02_AppendLifeforms.R' & trims it to retain the BIOSYS sites included in the zooplankton data
     + Trims variables across both phyto & zoop data, homogenises variable names and adds 'units' variables for clarity
     + Binds phyto and zoop data (long format) into a singe df & appends site metadata by left_join of zooplankton metadata
+    + Homogenises variables to consistent units and calculates ug carbon/m3 values for each taxon in each sample
     + Exports
 
+* script: '05_homogeniseUnits.R'
+    + Import phytoplankton & zooplankton data which correspond to zooplankton BIOSYS sites generated in '03_JoinPhytoZoops.R'
+    + Generates initial plots of trends/relationships
 
 ## TO DO
 
@@ -39,5 +43,5 @@ Incorporating phytoplankton abundances and carbon contents.
 * ~Check 'missing' taxa for carbon values.  Can we use congeners/parent taxa values?~
 * ~Update script '01_....' to incorporate amended carbon values~
 * ~Update/sense check subsequent scripts to ensure no errors~
-* Apparent under-estimation of phyto carbon (or OVER-estimation of zoops)
+* ~Apparent under-estimation of phyto carbon (or OVER-estimation of zoops)~
 * ?Clean code into a single script?
