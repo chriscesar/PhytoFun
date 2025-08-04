@@ -117,7 +117,7 @@ dfall_use %>%
   # put Regions in 'clockwise' order
   dplyr::mutate(rgn_wb = paste0(region,": ",wb)) %>% 
   dplyr::select(-c(
-    #lifeform,
+    lifeform,
     abundance, abundance_units,
     #abundance_m3,
     mn_carb_tot, mn_carb_tot_units,
@@ -126,7 +126,7 @@ dfall_use %>%
     md_carb_ind_units,mn_carb_ind_as_ugC,md_carb_ind_as_ugC,
     mn_size,mn_size_units,md_size,md_size_units,
     aphia_id,taxon
-    )) %>% 
+    )) %>% #names()
   dplyr::filter(sample_date > "2022-06-01") %>% #names()
   group_by(across(c(-abundance_m3,
                     -mn_carb_ugC_per_m3,
@@ -163,8 +163,8 @@ dfall_use %>%
     )
     ) %>% 
   ggplot(., aes(
-    # x = yday,
-    x = sample_date,
+    x = yday,
+    #x = sample_date,
     y = log10(md_carb_ugC_per_m3+1),
     fill = data_set,
     shape = data_set
@@ -172,11 +172,14 @@ dfall_use %>%
   geom_point() +
   scale_shape_manual(values = c(21,24))+
   scale_fill_manual(values=c("green","blue"))+
-  geom_smooth(method = "loess", se=FALSE, aes(colour = data_set))+
+  geom_smooth(method = "gam",
+              # formula = y ~ s(x, bs = "ds",k=10),# for date
+              formula = y ~ s(x, bs = "cc",k=10),# for day of year
+              se=FALSE, aes(colour = data_set))+
   scale_colour_manual(values=c("green","blue"))+
-  facet_wrap(.~regn_wb_lbl, scale = "free_y") +
+  facet_wrap(.~regn_wb_biosys_lbl) +
   labs(title = "Estimated carbon content in phytoplankton and zooplankton populations")+
-  xlab("Date")+
+  xlab("Day of year")+
   ylab("log10(Carbon content +1)")+
   theme(
     axis.title = element_text(face=2),
