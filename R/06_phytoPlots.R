@@ -65,6 +65,7 @@ tic("Summarise data by sampling event & plot")
 
 # how many samples should a WB have?
 number <- 100
+formula <- y ~ x
 
 # dfphyto_trm %>% 
 #   dplyr::select(-c(
@@ -137,7 +138,7 @@ dfphyto_trm %>%
     ),
     .groups = "drop"
   ) %>%
-  dplyr::filter(sample_date > "2008-01-01") %>% 
+  # dplyr::filter(sample_date > "2008-01-01") %>% 
   ggplot(., aes(
     # x = yday,
     x = sample_date,
@@ -146,6 +147,8 @@ dfphyto_trm %>%
     )
     ) +
   geom_point(
+    aes(colour = river_basi),
+    show.legend = FALSE,
     alpha = 0.25
   ) +
   facet_wrap(.~wb_name) +
@@ -155,4 +158,28 @@ dfphyto_trm %>%
     se = FALSE,
     # formula = y ~ s(x, bs = "ds",k=10),# gam for date
     # formula = y ~ s(x, bs = "cc",k=10),# gam for day of year
-    )
+    )+
+  # add p values to linear model
+  # ggpmisc::stat_fit_glance(
+  #   method = "lm",
+  #   method.args = list(formula=formula),
+  #   geom = "text",
+  #   aes(label = paste("P = ", signif(..p.value.., digits = 3), sep = "")),
+  #   label.x = "centre"
+  #   )+
+  ggpmisc::stat_poly_eq(
+    aes(label =  paste(
+      #..eq.label..,
+      ..rr.label..,
+      ..p.value.label..,
+      sep = "~~~~"
+      )),
+    formula = formula,
+    parse = TRUE,
+    label.x = "right",
+    label.y = "top"
+  )+
+  scale_color_manual(values=cbPalette)+
+  theme(
+    strip.text = element_text(face = 2)
+  )
