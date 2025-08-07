@@ -260,7 +260,7 @@ dfall %>% left_join(.,zoop_meta, by = "biosys_short") %>%
 toc(log = TRUE)  
 
 tic("calculate values in consistent units")
-# calculate values in consistent units
+# calculate values in consistent units ####
 dfall %>% 
   ## create variable for micrograms of Carbon per INDIVIDUAL
   mutate(
