@@ -163,8 +163,8 @@ dfall_use %>%
     )
     ) %>% 
   ggplot(., aes(
-    x = yday,
-    #x = sample_date,
+    #x = yday,
+    x = sample_date,
     y = log10(md_carb_ugC_per_m3+1),
     fill = data_set,
     shape = data_set
@@ -173,14 +173,18 @@ dfall_use %>%
   scale_shape_manual(values = c(21,24))+
   scale_fill_manual(values=c("green","blue"))+
   geom_smooth(method = "gam",
-              # formula = y ~ s(x, bs = "ds",k=10),# for date
-              formula = y ~ s(x, bs = "cc",k=10),# for day of year
+              formula = y ~ s(x, bs = "ds",k=10),# for date
+              # formula = y ~ s(x, bs = "cc",k=10),# for day of year
               se=FALSE, aes(colour = data_set))+
   scale_colour_manual(values=c("green","blue"))+
   facet_wrap(.~regn_wb_biosys_lbl) +
-  labs(title = "Estimated carbon content in phytoplankton and zooplankton populations")+
-  xlab("Day of year")+
-  ylab("log10(Carbon content +1)")+
+  labs(title = "Estimated carbon content in phytoplankton and zooplankton populations",
+       subtitle = "Plots faceted by Region_Waterbody_Monitoring Site",
+       # caption = "Lines indicate generalised additive model predictions with cyclic cubic spline basis function",
+       caption = "Lines indicate generalised additive model predictions with Duchon splines",
+       # x="Day of year",
+       x="Date",
+       y=bquote(bold(log[10][(n+1)]~Carbon~content)))+
   theme(
     axis.title = element_text(face=2),
     strip.text = element_text(face=2),
