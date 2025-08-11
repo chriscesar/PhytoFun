@@ -355,6 +355,11 @@ df0_raw %>%
   # remove NA and Inf values
   dplyr::filter(!is.na(ratio_md_carbon_tot_mg_c_per_m3)) %>% 
   dplyr::filter(!is.infinite(ratio_md_carbon_tot_mg_c_per_m3)) %>% 
+  mutate(
+    gtr0 = case_when(
+      log10(ratio_md_carbon_tot_mg_c_per_m3) > 0  ~ "Above",
+      log10(ratio_md_carbon_tot_mg_c_per_m3) < 0  ~ "Below",
+      log10(ratio_md_carbon_tot_mg_c_per_m3) == 0 ~ "Zero")) %>% 
   group_by(wb_name) %>% dplyr::filter(n() >= number) %>% ungroup() %>% 
   dplyr::filter(sample_date > "2008-01-01") %>% 
   ggplot(aes(
@@ -363,6 +368,7 @@ df0_raw %>%
   )
   )+
   geom_point(
+    aes(colour = gtr0), show.legend = FALSE,
     alpha = 0.25
   )+
   facet_wrap(.~rbd)+
@@ -370,11 +376,13 @@ df0_raw %>%
     method="gam",
     se=TRUE
     )+
+  geom_hline(yintercept = log10(1))+
   labs(title =
-         bquote(bold(Ratio~of~carbon~content~'in'~diatoms~taxa~to~that~'in'~donoflagellates)),
+         bquote(bold(Ratio~of~log[10]~carbon~content~'in'~diatoms~taxa~to~that~'in'~donoflagellates)),
        y= bquote(bold(Log[10]~ratio~of~diatom~carbon~to~dinoflagellate~carbon)
                  ),
-       caption="Blue line indicates GAM smoother"
+       caption="Blue line indicates GAM smoother\nOnly samples where both diatoms and dinoflagellates were recorded are displayed",
+       # subtitle = "Just for fun"
        )+
   theme(
     axis.title.x = element_blank(),
