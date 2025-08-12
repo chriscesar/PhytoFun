@@ -46,6 +46,7 @@ df0_raw %>%
     op_catch,
     typology,
     site_id, biosys_code, biosys_short, site_station_name,
+    eastings,northings,
     sample_date,
     replicate_code, settling_time, sample_method, 
     colonies_per_litre_millilitre, analysis_type, analysis_method,
