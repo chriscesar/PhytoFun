@@ -191,3 +191,76 @@ dfall_use %>%
     legend.title = element_blank()
     )
 
+
+dfall_use %>% 
+  # put Regions in 'clockwise' order
+  dplyr::mutate(rgn_wb = paste0(region,": ",wb)) %>% 
+  dplyr::select(-c(
+    lifeform,
+    abundance, abundance_units,
+    #abundance_m3,
+    mn_carb_tot, mn_carb_tot_units,
+    md_carb_tot, md_carb_tot_units,
+    mn_carb_ind,mn_carb_ind_units,md_carb_ind,
+    md_carb_ind_units,mn_carb_ind_as_ugC,md_carb_ind_as_ugC,
+    mn_size,mn_size_units,md_size,md_size_units,
+    aphia_id,taxon
+  )) %>% #names()
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  group_by(across(c(-abundance_m3,
+                    -mn_carb_ugC_per_m3,
+                    -md_carb_ugC_per_m3
+  ))) %>% 
+  summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
+            mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3,na.rm = TRUE),
+            md_carb_ugC_per_m3 = sum(md_carb_ugC_per_m3, na.rm = TRUE),
+            .groups = "drop") %>% #View()
+  dplyr::mutate(yday = lubridate::yday(sample_date)) %>% 
+  ## reorder sites by region
+  dplyr::mutate(biosys_short = factor(
+    biosys_short,
+    levels = unique(biosys_short[order(region)])
+  )
+  ) %>% 
+  ## create label variable
+  dplyr::mutate(regn_wb_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb))) %>%
+  dplyr::mutate(regn_wb_biosys_lbl = paste0(vegan::make.cepnames(region),
+                                            "_",
+                                            vegan::make.cepnames(wb),
+                                            "_",
+                                            biosys_short)) %>%
+  dplyr::mutate(regn_wb_lbl = factor(
+    regn_wb_lbl,
+    levels = unique(regn_wb_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::mutate(regn_wb_biosys_lbl = factor(
+    regn_wb_biosys_lbl,
+    levels = unique(regn_wb_biosys_lbl[order(region)])
+  )
+  ) %>% 
+  ggplot(., aes(
+    x = data_set,
+    y = log10(md_carb_ugC_per_m3+1)
+  ))+
+  geom_boxplot(outliers = FALSE)+
+  labs(title = "Estimated carbon content for phytoplankton and zooplankton populations",
+       subtitle = "Each point represents the summed estimated carbon contents in phytoplankton and zooplankton samples",
+       # caption = "Lines indicate generalised additive model predictions with cyclic cubic spline basis function",
+       # caption = "Lines indicate generalised additive model predictions with Duchon splines",
+       # x="Day of year",
+       x="Date",
+       y=bquote(bold(log[10][(n+1)]~Carbon~content)))+
+  geom_jitter(width = 0.3, alpha = 0.2)+
+  theme(
+    axis.title.x = element_blank(),
+    axis.text = element_text(face=2)
+  )
+
+median(log10(dfall_use$md_carb_ugC_per_m3),na.rm=TRUE)
+
+dfall_use %>% 
+  group_by(data_set) %>% 
+  summarise(log10(median(md_carb_ugC_per_m3+1,na.rm=TRUE)))
