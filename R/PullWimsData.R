@@ -114,143 +114,44 @@ wimsdat %>%
   dplyr::mutate(code = str_remove_all(code, "-")) -> wimsdat_wb
 toc(log=TRUE)
 
+# create WBID_date variable for plankton data ####
+tic("Create WBID_date variable for plankton data")
+dfsummary %>% 
+  dplyr::mutate(code = paste0(wbid, "_", sample_date)) %>% 
+  dplyr::mutate(code = str_remove_all(code, "-")) -> dfsummary_wb
+
+# Trim WIMS data by those '.$code' values in plankton data ####
+tic("Trim WIMS data by those '.$code' values in plankton data")
+logics <- wimsdat_wb$code %in% dfsummary_wb$code
+
+wimsdat_wb[logics,] -> wimsdat_wb_trm
+rm(logics)
+toc(log = TRUE)
+
+# Widen trimmed wims data ####
+tic("Widen trimmed wims data")
+## append units to descriptors
+wimsdat_wb_trm %>%
+  dplyr::mutate(dete_units = paste0(DETE_SHORT_DESC,"_",UNIT_SHORT_DESC)) %>% 
+  #remove now-obsolete info
+  dplyr::select(-c(
+    DETE_SHORT_DESC,
+    UNIT_SHORT_DESC
+  )) %>% 
+  # append qualifiers to result
+  dplyr::mutate(
+    result_use = if_else(
+      MEAS_SIGN %in% c("<", ">"),
+      paste0(MEAS_SIGN, MEAS_RESULT),
+      as.character(MEAS_RESULT)
+      )) %>% 
+  dplyr::select(-c(MEAS_SIGN, MEAS_RESULT)) %>% 
+  # Pivot to wider
+  pivot_wider(
+    names_from = dete_units,
+    values_from = result_use
+    ) -> wimsdat_wb_trm_w
 
 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# 
-# # other data processing
-# # save(hms.data, file = '~/A_RStudio_projects/H4/peripheralH4/Harmonised and Ospar/hms.test.data.rda')
-# 
-# # =====================================
-# # annual count of orthophosphate data
-# library(sf)
-# library(ggplot2)
-# 
-# load("O:/National_Hydroecology/WIMS_cache/all.wims.sites.rda")
-# load("O:/WRTS/Hydroecology/GIS/shapefiles_base_zip/areas.pf3.ms.wsea.rda")
-# 
-# areas <- 
-#   areas.pf3.ms.wsea |>
-#   filter(SEAWARD == 'No') |>
-#   st_set_crs(value = 27700)
-# 
-# st_crs(areas) <- 27700
-# 
-# 
-# tic()
-# orthop <- 
-#   wims.p |> 
-#   filter(MEAS_DETERMINAND_CODE == '0180') |> 
-#   collect()
-# toc()
-# 
-# orthop2 <- 
-#   orthop |>
-#   mutate(year = year(DATE_TIME))
-# 
-# orthop.site.year <- 
-#   orthop2 |>
-#   group_by(notation, year) |>
-#   tally()
-# 
-# orthop.site.year2 <-
-#   orthop.site.year |>
-#   left_join(all.wims.sites |> 
-#               select(notation, 
-#                      SMPT_TYPE, 
-#                      SMPT_EASTING, 
-#                      SMPT_NORTHING, 
-#                      ARE_DESC)) |>
-#   filter(!is.na(SMPT_EASTING)) |>
-#   st_as_sf(coords = c('SMPT_EASTING', 'SMPT_NORTHING')) |>
-#   st_set_crs(value = 27700)
-# 
-# orthop.site.year2 |>
-#   filter(year >= 1980 & year <= 1999) |>
-#   #  filter(year >= 2000 & year <= 2019 )
-#   #  filter(year == 1980) |>
-#   ggplot() +
-#   geom_sf(data = areas) +
-#   geom_sf(aes(colour = n), size = 0.5) +
-#   scale_colour_viridis_c() +
-#   facet_wrap(~year) + 
-#   coord_sf(datum = sf::st_crs(27700)) +
-#   theme_bw()
-# 
-# ggsave()
-# 
-# # -------------------------------
-# # Data for Joe McGovern marine Ireland
-# library(readxl)
-# site.list.hms <- 
-#   read_excel("O:/NCES Team/Evidence Synthesis/R/Harmonised and Ospar/HMS metadata.xlsx", 
-#              sheet = 'sites') |>
-#   mutate(notation = paste(Region, WIMSCode, sep = '-'))
-# 
-# my.dets <- c('0076', '9857', '4127', '0180', '0116', '0061', '7675', 
-#              '9821', '7867', '9822', '0165')
-# 
-# tic()
-# hms.data <- 
-#   wims.p |>
-#   filter(notation %in% site.list.hms$notation & MEAS_DETERMINAND_CODE %in%  my.dets) %>%
-#   collect()
-# toc()
-# 
-# # excel too large
-# #writexl::write_xlsx(hms.data, path = 'Harmonised and Ospar/Data for Joe McGovern 2025-04-30.xlsx')
-# # nanoparquet::write_parquet(hms.data, file = 'Harmonised and Ospar/Data for Joe McGovern 2025-04-30.parquet')
-# 
-# # ------------------------------
-# # Data for CEFAS - site and det lists in one spreadsheet
-# library(readxl)
-# library(stringr)
-# library(lubridate)
-# 
-# my.filename <- 
-#   "O:/National_Hydroecology/WIMS_cache/scripts/EA_Legacy_data_request_Hassan_CEFAS.xlsx"
-# 
-# site.list.ospar <- 
-#   read_excel(my.filename, 
-#              sheet = 'Riverine Sites')
-# det.list.ospar <-
-#   read_excel(my.filename, 
-#              sheet = 'Determinands') |>
-#   mutate(det.code = str_replace(dtr_id, '#', ''))
-# 
-# ospar.data <- 
-#   wims.p |>
-#   filter(notation %in% site.list.ospar$site_id & MEAS_DETERMINAND_CODE %in%  det.list.ospar$det.code) |>
-#   collect()
-# 
-# ospar.data <-
-#   ospar.data |>
-#   mutate(det.code.desc = paste(DETE_SHORT_DESC, MEAS_DETERMINAND_CODE, sep = ': '),
-#          DATE = as.Date(DATE_TIME),
-#          DATE_DEC = round(decimal_date(floor_date(DATE, 'month')), 2), 
-#          YEAR = year(DATE), 
-#          MONTH = month(DATE), 
-#          network = 'OSPAR'
-#   )
-# 
-# monthly.site.det <-
-#   ospar.data |>
-#   group_by(network, notation, DATE_DEC, det.code.desc) |>
-#   summarise(n = n()) |>
-#   ungroup()
-# 
-# # now use script X_plot sampling effort in HMS/OSPAR folder
-# 
-# nanoparquet::write_parquet(ospar.data, 
-#                            file = 'O:/NCES Team/Evidence Synthesis/R/Harmonised and Ospar/OSPAR sampling effort/OSPAR_DATA_HASSAN_2025-08-05.parquet')
-# writexl::write_xlsx(
-#   ospar.data, path = 'O:/NCES Team/Evidence Synthesis/R/Harmonised and Ospar/OSPAR sampling effort/OSPAR_DATA_HASSAN_2025-08-05.xlsx')
-# 
+unlist(tictoc::tic.log())
 
