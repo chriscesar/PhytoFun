@@ -568,11 +568,16 @@ mxCells <- log10(max(df0_raw$cells_per_m3[df0_raw$name_use == plnk],
                      na.rm = TRUE))
 
 df0_raw %>%
-  dplyr::filter(grepl(plnk,name_use)) %>% 
+  # dplyr::filter(grepl(plnk,name_use)) %>%
+  dplyr::filter(grepl(paste0("^",plnk),name_use)) %>%
+  dplyr::mutate(rbd_wb_biosys = paste0(rbd,"_",wb_name,"_",biosys_code)) %>% 
+  dplyr::mutate(rbd_wb_biosys = factor(rbd_wb_biosys,
+                                       levels = unique(rbd_wb_biosys[order(rbd)]))) %>%
   dplyr::select(
     rbd,
     wbid, 
     wb_name,
+    rbd_wb_biosys,
     wb_type,
     hm_desig,
     area_name,
@@ -651,31 +656,49 @@ df0_raw %>%
   dplyr::mutate(
     month = lubridate::month(sample_date),
     year = lubridate::year(sample_date)) %>% 
-  dplyr::filter(year>2007) %>% 
-  dplyr::filter(rbd != "Severn") %>% 
-  dplyr::filter(rbd != "Solway Tweed") %>% 
+  # dplyr::filter(year>2007) %>% # Keep only most recent data
+  # dplyr::filter(rbd != "Severn") %>% # throw out data-scarce sites
+  # dplyr::filter(rbd != "Solway Tweed") %>% # throw out data-scarce sites
   ggplot(aes(
     x = year,
     y = month
     )) +
-  geom_hline(yintercept = seq(0.5,12.5,by=1),lty = 2, colour="grey")+
-  geom_vline(xintercept = seq(from=2007.5, to=2025.5, by=1), lty = 2, colour="grey") +
+  geom_rect(xmin = -Inf,
+            xmax = 2030,
+            ymin = 0,
+            ymax = Inf,
+            # fill="lightskyblue2",
+            fill="paleturquoise",
+            alpha=0.1
+            )+
   geom_tile(aes(fill = log10(cells_per_m3)),show.legend = TRUE)+
-  facet_wrap(.~rbd)+
+  geom_hline(yintercept = seq(0.5,12.5,by=1),lty = 2, colour="grey")+
+  geom_vline(xintercept = seq(from=1999.5, to=2025.5, by=1), lty = 2, colour="grey") +
+  # facet_wrap(.~wb_name)+ #By water body
+  facet_wrap(.~rbd)+ #By river basin
   scale_fill_gradient(limits = c(0,mxCells),
-                      low = "lightskyblue2", high = "red")+
-  labs(title = paste0("Heatmaps of ",plnk," abundances"),
-       subtitle = bquote(Data~expressed~as~log[10]~cells~~m^-3),
+                      low = "paleturquoise", high = "orange3")+
+  labs(title = paste0("'",plnk,"' abundances"),
+       subtitle = bquote(Values~expressed~as~log[10]~cells~~m^-3),
        x="",
        y="Month")+
   guides(fill=guide_legend(title=bquote(bold(Log[10]~Cells~m^-3)),
                            reverse = TRUE))+
   scale_y_continuous(breaks= scales::pretty_breaks())+
-  coord_cartesian(xlim = c(2008,NA),
-                  ylim = c(1,12))+
+  coord_cartesian(
+    xlim = c(2007,NA),
+    ylim = c(1,12))+
   theme(
     axis.title = element_text(face=2),
     axis.text = element_text(face=2),
     strip.text = element_text(face=2),
     legend.title = element_text(face=2)
   )
+
+#### examine acf plots: Critical slowing down????
+df0_raw %>%
+  filter(wb_name=="Mersey Mouth") %>%
+  filter(biosys_short=="LIV001") %>% 
+  filter(name_use == "Pseudo-nitzschia") %>% 
+  bayesforecast::ggacf(md_carbon_tot_mg_c_per_m3)
+  
