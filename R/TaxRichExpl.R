@@ -591,7 +591,7 @@ tic("fit3.6 summaries")
 pp_check(fit3.6,
          # ndraws = 800,
          ndraws = 300,
-         alpha=0.15
+         alpha=0.25
          )
 toc(log=TRUE)
 
@@ -642,7 +642,7 @@ df_S_Annual %>%
   #scale_fill_brewer(palette="Greys")+
   scale_color_brewer(palette = "Paired")+
   scale_linetype_manual(values = c(
-    "solid", "dashed", "dotted", "dotdash",
+    "solid", "dashed", "dotdash", "dotted",
     "longdash", "twodash", "solid", "dashed", "dotted"
   ))+
   guides(fill = "none")+
@@ -651,7 +651,7 @@ df_S_Annual %>%
     title = "Model-predicted taxon richness over time by river basin district",
     y = "Taxon richness",
     caption = paste0("Lines indicate model predictions\n",
-                     "Model formula: ",fit3.6$formula,"\n",
+                     "Model formula: (",fit3.6$formula,", ",as.character(fit3.6$formula)[2],")\n",
                      "Family: ",fit3.6$family,"\n",
                      "Chains: ",summ_fit3.6$chains,"; Iterations: ",summ_fit3.6$iter,"\n",
                      "R-sq: ",round(bayes_R2(fit3.6)[,"Estimate"]*100,2),"%"),
@@ -749,14 +749,14 @@ ggplot(curvature_summary, aes(year, mean_curv)) +
   geom_line() +
   geom_hline(yintercept = 0, linetype = "dashed") +
   labs(
-    # ### first derivatives
-    # title = "First derivatives of taxon richness over time", 
-    # #first derivatives
-    # subtitle = "Visualisation of rates of change over time.\nPositive first derivatives indicate increasing taxon richness, negative values indicate decreasing taxon richness"
+    ### first derivatives
+    title = "First derivatives of taxon richness over time",
+    #first derivatives
+    subtitle = "Visualisation of rates of change over time.\nPositive first derivatives indicate increasing taxon richness, negative values indicate decreasing taxon richness"
     ## second derivatives
-    title = "Second derivatives of taxon richness over time",
-    ## second derivatives
-    subtitle = "Visualisation of rates of change over time.\nPositive second derivatives indicate accelerating change, negative values indicate decelerating change, and zero values indicate a constant rate of change"
+    # title = "Second derivatives of taxon richness over time",
+    # ## second derivatives
+    # subtitle = "Visualisation of rates of change over time.\nPositive second derivatives indicate accelerating change, negative values indicate decelerating change, and zero values indicate a constant rate of change"
     )+
   facet_wrap(~ rbd)
 toc(log=TRUE)
