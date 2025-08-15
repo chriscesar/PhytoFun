@@ -3,7 +3,7 @@
 
 # load packages ####
 ld_pkgs <- c("tidyverse","tictoc","stringr",
-             "brms", "tidybayes")
+             "brms", "tidybayes", "data.table")
 vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
@@ -63,6 +63,38 @@ df0_raw %>%
 S <- vegan::specnumber(dfw[,-c(1:10)])  
 dfw$S <- S;rm(S)
 
+# create annual summary for modelling ####
+dfw %>% 
+  dplyr::filter(sample_date >"2008-01-01") %>% #names() %>% 
+  dplyr::select(
+    rbd,
+    wbid,
+    wb_name,
+    site_id,
+    replicate_code,
+    biosys_short,
+    sample_date,
+    surveillan,
+    eastings,
+    northings,
+    S
+  ) %>% 
+  dplyr::mutate(year = lubridate::year(sample_date)) %>% 
+  dplyr::select(-c(sample_date,
+                   biosys_short,
+                   replicate_code,
+                   surveillan,
+                   eastings,
+                   northings,
+                   wbid,
+                   wb_name,
+                   site_id
+  )
+  ) %>% 
+  group_by(across(-S)) %>% 
+  summarise(S = mean(S, na.rm = TRUE),
+            .groups = "drop") %>% ungroup() -> df_S_Annual
+
 # throw away WBs with fewer than this number of samples:
 number <- 500
 dfw %>% 
@@ -98,12 +130,13 @@ dfw %>%
   )
 
 tic("Fit distributional model of S over time")
-fit1 <- brm(bf(S ~ sample_date,
-               sigma ~ sample_date),
-            data = dfw %>% dplyr::filter(wb_name == "CARRICK ROADS INNER") %>% # remove zero S values
-              dplyr::filter(sample_date > "2008-01-01"),
-            family = gaussian())
-saveRDS(fit1, file= "outputs/models/01distrib_S_time.Rdat")
+# fit1 <- brm(bf(S ~ sample_date,
+#                sigma ~ sample_date),
+#             data = dfw %>% dplyr::filter(wb_name == "CARRICK ROADS INNER") %>% # remove zero S values
+#               dplyr::filter(sample_date > "2008-01-01"),
+#             family = gaussian())
+# saveRDS(fit1, file= "outputs/models/01distrib_S_time.Rdat")
+fit1 <- readRDS("outputs/models/01distrib_S_time.Rdat")
 toc(log=TRUE)
 
 tic("Model summaries")
@@ -120,37 +153,6 @@ hyp <- "exp(sigma_Intercept + sigma_sample_date) > exp(sigma_Intercept)"
 plot(hyp, chars = NULL)
 
 ## fit 2 ####
-dfw %>% 
-  dplyr::filter(sample_date >"2008-01-01") %>% #names() %>% 
-  dplyr::select(
-    rbd,
-    wbid,
-    wb_name,
-    site_id,
-    replicate_code,
-    biosys_short,
-    sample_date,
-    surveillan,
-    eastings,
-    northings,
-    S
-  ) %>% 
-  dplyr::mutate(year = lubridate::year(sample_date)) %>% 
-  dplyr::select(-c(sample_date,
-                   biosys_short,
-                   replicate_code,
-                   surveillan,
-                   eastings,
-                   northings,
-                   wbid,
-                   wb_name,
-                   site_id
-                   )
-                ) %>% 
-  group_by(across(-S)) %>% 
-  summarise(S = mean(S, na.rm = TRUE),
-            .groups = "drop") %>% ungroup() -> df_S_Annual
-
 df_S_Annual %>% 
   ggplot(aes(
     x = year,
@@ -162,14 +164,14 @@ df_S_Annual %>%
 tic("fit2")
 # fit2 <- brm(bf(S ~ s(year) + (1|rbd)),
 # fit2 <- brm(bf(S ~ s(year) + rbd),
-fit2 <- brm(bf(S ~ s(year) + rbd + (year|rbd), sigma ~ s(year)),
-            data = df_S_Annual,
-            family = gaussian())
-saveRDS(fit2, file= "outputs/models/02distrib_S_rbd_time.Rdat")
+# fit2 <- brm(bf(S ~ s(year) + rbd + (year|rbd), sigma ~ s(year)),
+#             data = df_S_Annual,
+#             family = gaussian())
+# saveRDS(fit2, file= "outputs/models/02distrib_S_rbd_time.Rdat")
 fit2 <- readRDS("outputs/models/02distrib_S_rbd_time.Rdat")
 toc(log=TRUE)
-summary(fit2)
 
+summary(fit2)
 plot(fit2)
 
 conditional_effects(fit2, surface = TRUE)
@@ -184,13 +186,14 @@ conditional_smooths(fit2, surface = TRUE)
 # https://m-clark.github.io/posts/2021-02-28-practical-bayes-part-ii/#summary-the-practical-approach-to-bayesian-models
 
 tic("fit3")
-fit3 <- brms::brm(S ~ I(year - 2008),
-                           data = df_S_Annual,
-                        family = gaussian(),
-                        chains = 4,
-                        iter = 3000,
-                        warmup = 1000)
-saveRDS(fit3, file = "outputs/models/03brmsSimple.Rdat")
+# fit3 <- brms::brm(S ~ I(year - 2008),
+#                            data = df_S_Annual,
+#                         family = gaussian(),
+#                         chains = 4,
+#                         iter = 3000,
+#                         warmup = 1000)
+# saveRDS(fit3, file = "outputs/models/03brmsSimple.Rdat")
+fit3 <- readRDS("outputs/models/03brmsSimple.Rdat")
 toc(log=TRUE)
 
 summary(fit3)
@@ -199,44 +202,47 @@ pp_check(fit3)
 ### fit 3.1 ####
 ## add 'year' as a random effect
 tic("fit3.1")
-fit3.1 <- brms::brm(S ~ I(year - 2008) + (1|year),
-                  data = df_S_Annual,
-                  family = gaussian(),
-                  chains = 4,
-                  iter = 3000,
-                  warmup = 1000)
-saveRDS(fit3.1, file = "outputs/models/03.1brmsSimple.Rdat")
+# fit3.1 <- brms::brm(S ~ I(year - 2008) + (1|year),
+#                   data = df_S_Annual,
+#                   family = gaussian(),
+#                   chains = 4,
+#                   iter = 3000,
+#                   warmup = 1000)
+# saveRDS(fit3.1, file = "outputs/models/03.1brmsSimple.Rdat")
+fit3.1 <- readRDS("outputs/models/03.1brmsSimple.Rdat")
 toc(log=TRUE)
 
 summary(fit3.1);plot(fit3.1)
 
 ### fit 3.2 ####
 tic("fit3.2") #adding location parameter
-fit3.2 <- brms::brm(S ~ I(year - 2008)+rbd,
-                    data = df_S_Annual,
-                    family = gaussian(),
-                    chains = 4,
-                    iter = 3000,
-                    warmup = 1000)
-saveRDS(fit3.2, file = "outputs/models/03.2brmsSimple.Rdat")
+# fit3.2 <- brms::brm(S ~ I(year - 2008)+rbd,
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 3000,
+#                     warmup = 1000)
+# saveRDS(fit3.2, file = "outputs/models/03.2brmsSimple.Rdat")
+fit3.2 <- readRDS("outputs/models/03.2brmsSimple.Rdat")
 toc(log = TRUE)
 
 summary(fit3.2)
 plot(fit3.2)
 pp_check(fit3.2,ndraws = 100)
 
+### fit 3.3 ####
 tic("fit3.3") #adding variable sigma
-fit3.3 <- brms::brm(bf(S ~ I(year - 2008)+rbd,
-                    sigma ~ rbd),
-                    data = df_S_Annual,
-                    family = gaussian(),
-                    chains = 4,
-                    iter = 3000,
-                    warmup = 1000)
-saveRDS(fit3.3, file = "outputs/models/03.3brmsSimple.Rdat")
+# fit3.3 <- brms::brm(bf(S ~ I(year - 2008)+rbd,
+#                     sigma ~ rbd),
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 3000,
+#                     warmup = 1000)
+# saveRDS(fit3.3, file = "outputs/models/03.3brmsSimple.Rdat")
+fit3.3 <- readRDS("outputs/models/03.3brmsSimple.Rdat")
 toc(log = TRUE)
 
-### fit 3.3 ####
 tic("fit3.3 summaries")
 summary(fit3.3)
 plot(fit3.3)
@@ -271,14 +277,15 @@ toc(log=TRUE)
 
 ### fit 3.4 ####
 tic("fit3.4")
-fit3.4 <- brms::brm(bf(S ~ s(I(year - 2008))+rbd,
-                       sigma ~ rbd),
-                    data = df_S_Annual,
-                    family = gaussian(),
-                    chains = 4,
-                    iter = 3000,
-                    warmup = 1000)
-saveRDS(fit3.4, file = "outputs/models/03.4brmsSimple.Rdat")
+# fit3.4 <- brms::brm(bf(S ~ s(I(year - 2008))+rbd,
+#                        sigma ~ rbd),
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 3000,
+#                     warmup = 1000)
+# saveRDS(fit3.4, file = "outputs/models/03.4brmsSimple.Rdat")
+fit3.4 <- readRDS("outputs/models/03.4brmsSimple.Rdat")
 toc(log=TRUE)
 
 tic("fit3.4 summaries")
@@ -389,19 +396,24 @@ brms::pp_check(fit3.4, ndraws = 200)
 
 ### fit 3.5 ####
 tic("fit3.5") #truncated gaussian
-fit3.5 <- brms::brm(bf(S|trunc(lb = 0) ~ s(I(year - 2008))+rbd,
-                       sigma ~ rbd),
-                    data = df_S_Annual,
-                    family = gaussian(),
-                    chains = 4,
-                    iter = 10000,
-                    warmup = 3000)
-saveRDS(fit3.5, file = "outputs/models/03.5brmsSimple.Rdat")
+# fit3.5 <- brms::brm(bf(S|trunc(lb = 0) ~ s(I(year - 2008))+rbd,
+#                        sigma ~ rbd),
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 10000,
+#                     warmup = 3000)
+# saveRDS(fit3.5, file = "outputs/models/03.5brmsSimple.Rdat")
+fit3.5 <- readRDS("outputs/models/03.5brmsSimple.Rdat")
 toc(log=TRUE)
 
 tic("fit3.5 summaries")
-summ_fit3.5 <- summary(fit3.5)
-pp_check(fit3.5,ndraws = 100)
+(summ_fit3.5 <- summary(fit3.5))
+pp_check(fit3.5,
+         # ndraws = 800,
+         ndraws = 300,
+         alpha=0.15
+         )
 toc(log=TRUE)
 
 tic("fit3.5 plots")
@@ -420,14 +432,12 @@ df_S_Annual %>%
     show.legend = FALSE
   ) +
   scale_fill_brewer(palette = "Greys") +
-  # scale_color_brewer(palette = "PiYG") +
-  # scale_shape_manual(values = c(0:3,0:3,0))+
   geom_point(data = df_S_Annual) +
   labs(
     title = "Mean taxon richness over time by river basin district",
     y = "Taxon richness",
-    caption = "Blue lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals"
-  )+
+    caption = "Bold lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals"
+    )+
   facet_wrap(. ~ rbd)+
   theme(
     axis.title.x = element_blank(),
@@ -457,6 +467,7 @@ df_S_Annual %>%
     "longdash", "twodash", "solid", "dashed", "dotted"
   ))+
   guides(fill = "none")+
+  ylim(0,NA)+
   labs(
     title = "Model-predicted taxon richness over time by river basin district",
     y = "Taxon richness",
@@ -464,7 +475,7 @@ df_S_Annual %>%
                      "Model formula: ",fit3.5$formula,"\n",
                      "Family: ",fit3.5$family,"\n",
                      "Chains: ",summ_fit3.5$chains,"; Iterations: ",summ_fit3.5$iter,"\n",
-                     "R2: ",round(bayes_R2(fit3.5)[,"Estimate"]*100,2),"%"),
+                     "R-sq: ",round(bayes_R2(fit3.5)[,"Estimate"]*100,2),"%"),
     linetype = "River basin district",
     colour = "River basin district"
   )+
@@ -477,10 +488,283 @@ df_S_Annual %>%
   )
 toc(log=TRUE)
 
+#### fit3.5 Plot second derivatives ####
+tic("Extract posterior smooths")
 
-## compare models ####
+##### Extract posterior smooths ####
+year_seq <- seq(min(df_S_Annual$year), max(df_S_Annual$year), length.out = 100)
+
+newdata <- expand_grid(
+  year = year_seq,
+  rbd = unique(df_S_Annual$rbd)
+)
+
+fitted_draws <- fit3.5 |>
+  add_fitted_draws(newdata = newdata, re_formula = NA)
+toc(log = TRUE)
+
+tic("Compute derivatives efficiently")
+##### Compute derivatives efficiently ####
+
+################
+# convert fitted_draws to data table
+tic("Convert to DT")
+setDT(fitted_draws)
+setorder(fitted_draws, rbd, .draw, year)
+fitted_draws[
+  , first_deriv := c(NA_real_, diff(.value) / diff(year)), 
+  by = .(rbd, .draw)
+]
+fitted_draws[
+  , second_deriv := c(NA_real_, diff(first_deriv) / diff(year[-1])), 
+  by = .(rbd, .draw)
+]
+fitted_draws <- fitted_draws[.draw %% 10 == 0]  # keep 1 in 10 draws
+toc(log=TRUE)
+
+###############
+get_derivatives <- function(df) {
+  df |>
+    arrange(year) |>
+    group_by(.draw) |>
+    mutate(
+      first_deriv  = c(NA, diff(.value) / diff(year)),
+      second_deriv = c(NA, diff(first_deriv) / diff(year[-1]))
+    ) |>
+    ungroup()
+}
+tic("calc derivatives")
+deriv_df <- fitted_draws |>
+  group_by(rbd) |>
+  group_modify(~ get_derivatives(.x))
+toc(log=TRUE)
+toc(log=TRUE)
+
+#### Summarise posterior for curvature ####
+tic("Summarise posterior for curvature")
+curvature_summary <- deriv_df |>
+  group_by(rbd, year) |>
+  summarise(
+    mean_curv = mean(second_deriv, na.rm = TRUE),
+    lower     = quantile(second_deriv, 0.025, na.rm = TRUE),
+    upper     = quantile(second_deriv, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+toc(log = TRUE)
+
+tic("Identify changepoints")
+#### Identify changepoints ####
+changepoints <- curvature_summary |>
+  group_by(rbd) |>
+  filter(sign(mean_curv) != lag(sign(mean_curv), default = first(sign(mean_curv)))) |>
+  filter(!between(0, lower, upper))
+toc(log=TRUE)
+
+tic("Plot for diagnosis")
+#### Plot for diagnosis ####
+ggplot(curvature_summary, aes(year, mean_curv)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ rbd)
+toc(log=TRUE)
+
+
+### fit 3.6 ####
+tic("fit3.6") # add factor-smoothed term to allow different trends by rbd
+# fit3.6 <- brms::brm(bf(S|trunc(lb = 0) ~ s(I(year - 2008),
+#                                            rbd,
+#                                            bs = "fs"),
+#                        sigma ~ rbd),
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 10000,
+#                     warmup = 3000)
+# saveRDS(fit3.6, file = "outputs/models/03.6brmsSimple.Rdat")
+fit3.6 <- readRDS("outputs/models/03.6brmsSimple.Rdat")
+toc(log=TRUE)
+
+tic("fit3.6 summaries")
+(summ_fit3.6 <- summary(fit3.6))
+pp_check(fit3.6,
+         # ndraws = 800,
+         ndraws = 300,
+         alpha=0.15
+         )
+toc(log=TRUE)
+
+tic("fit3.6 plots")
+df_S_Annual %>%
+  group_by(rbd) %>%
+  add_predicted_draws(fit3.6) %>%
+  ggplot(aes(x = year, y = S,
+             # color = ordered(rbd),
+             # fill = ordered(rbd),
+             # shape = rbd
+  )) +
+  stat_lineribbon(
+    aes(y = .prediction),
+    .width = c(.95, .80, .50),
+    alpha = 0.3,
+    show.legend = FALSE
+  ) +
+  scale_fill_brewer(palette = "Greys") +
+  geom_point(data = df_S_Annual) +
+  labs(
+    title = "Mean taxon richness over time by river basin district",
+    y = "Taxon richness",
+    caption = "Bold lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals"
+  )+
+  facet_wrap(. ~ rbd)+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    strip.text = element_text(face=2),
+    axis.text = element_text(face=2)
+  )
+
+df_S_Annual %>%
+  group_by(rbd) %>%
+  add_predicted_draws(fit3.6) %>%
+  ggplot(aes(x = year, y = S,
+             color = ordered(rbd),
+             linetype = ordered(rbd)
+  )) +
+  stat_lineribbon(
+    aes(y = .prediction),
+    .width = 0,
+    #.width = c(.95, .80, .50),
+    # alpha = 0.3,
+    #show.legend = FALSE
+  ) +
+  #scale_fill_brewer(palette="Greys")+
+  scale_color_brewer(palette = "Paired")+
+  scale_linetype_manual(values = c(
+    "solid", "dashed", "dotted", "dotdash",
+    "longdash", "twodash", "solid", "dashed", "dotted"
+  ))+
+  guides(fill = "none")+
+  ylim(0,NA)+
+  labs(
+    title = "Model-predicted taxon richness over time by river basin district",
+    y = "Taxon richness",
+    caption = paste0("Lines indicate model predictions\n",
+                     "Model formula: ",fit3.6$formula,"\n",
+                     "Family: ",fit3.6$family,"\n",
+                     "Chains: ",summ_fit3.6$chains,"; Iterations: ",summ_fit3.6$iter,"\n",
+                     "R-sq: ",round(bayes_R2(fit3.6)[,"Estimate"]*100,2),"%"),
+    linetype = "River basin district",
+    colour = "River basin district"
+  )+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    strip.text = element_text(face=2),
+    axis.text = element_text(face=2),
+    legend.title = element_text(face=2)
+  )
+toc(log=TRUE)
+
+#### fit3.6 Plot second derivatives ####
+tic("Extract posterior smooths")
+
+##### Extract posterior smooths ####
+year_seq <- seq(min(df_S_Annual$year), max(df_S_Annual$year), length.out = 100)
+
+newdata <- expand_grid(
+  year = year_seq,
+  rbd = unique(df_S_Annual$rbd)
+)
+
+fitted_draws <- fit3.6 |>
+  add_fitted_draws(newdata = newdata, re_formula = NA)
+toc(log = TRUE)
+
+tic("Compute derivatives efficiently")
+##### Compute derivatives efficiently ####
+
+# convert fitted_draws to data table
+tic("Convert to DT")
+setDT(fitted_draws)
+setorder(fitted_draws, rbd, .draw, year)
+fitted_draws[
+  , first_deriv := c(NA_real_, diff(.value) / diff(year)), 
+  by = .(rbd, .draw)
+]
+fitted_draws[
+  , second_deriv := c(NA_real_, diff(first_deriv) / diff(year[-1])), 
+  by = .(rbd, .draw)
+]
+fitted_draws <- fitted_draws[.draw %% 10 == 0]  # keep 1 in 10 draws
+toc(log=TRUE)
+
+get_derivatives <- function(df) {
+  df |>
+    arrange(year) |>
+    group_by(.draw) |>
+    mutate(
+      first_deriv  = c(NA, diff(.value) / diff(year)),
+      second_deriv = c(NA, diff(first_deriv) / diff(year[-1]))
+    ) |>
+    ungroup()
+}
+tic("calc derivatives")
+deriv_df <- fitted_draws |>
+  group_by(rbd) |>
+  group_modify(~ get_derivatives(.x))
+toc(log=TRUE)
+toc(log=TRUE)
+
+#### Summarise posterior for curvature ####
+tic("Summarise posterior for curvature")
+curvature_summary <- deriv_df |>
+  group_by(rbd, year) |>
+  summarise(
+    # mean_curv = mean(first_deriv, na.rm = TRUE),
+    # lower     = quantile(first_deriv, 0.025, na.rm = TRUE),
+    # upper     = quantile(first_deriv, 0.975, na.rm = TRUE),
+    mean_curv = mean(second_deriv, na.rm = TRUE),
+    lower     = quantile(second_deriv, 0.025, na.rm = TRUE),
+    upper     = quantile(second_deriv, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+toc(log = TRUE)
+
+tic("Identify changepoints")
+#### Identify changepoints ####
+changepoints <- curvature_summary |>
+  group_by(rbd) |>
+  filter(sign(mean_curv) != lag(sign(mean_curv), default = first(sign(mean_curv)))) |>
+  filter(!between(0, lower, upper))
+toc(log=TRUE)
+
+tic("Plot for diagnosis")
+
+#### Plot for diagnosis ####
+ggplot(curvature_summary, aes(year, mean_curv)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    # ### first derivatives
+    # title = "First derivatives of taxon richness over time", 
+    # #first derivatives
+    # subtitle = "Visualisation of rates of change over time.\nPositive first derivatives indicate increasing taxon richness, negative values indicate decreasing taxon richness"
+    ## second derivatives
+    title = "Second derivatives of taxon richness over time",
+    ## second derivatives
+    subtitle = "Visualisation of rates of change over time.\nPositive second derivatives indicate accelerating change, negative values indicate decelerating change, and zero values indicate a constant rate of change"
+    )+
+  facet_wrap(~ rbd)
+toc(log=TRUE)
+
+
+# compare models ####
 # Model with elpd of 0 shows the best fit to our data
-loo(fit3,fit3.1,fit3.2,fit3.3,fit3.4, fit3.5,
+loo(fit3,fit3.1,fit3.2,fit3.3,fit3.4, fit3.5,fit3.6,
     compare = TRUE)
 # fit3.5 gives best fit
 
@@ -490,6 +774,7 @@ x2 <- as.data.frame(bayes_R2(fit3.2))
 x3 <- as.data.frame(bayes_R2(fit3.3))
 x4 <- as.data.frame(bayes_R2(fit3.4))
 x5 <- as.data.frame(bayes_R2(fit3.5))
+x6 <- as.data.frame(bayes_R2(fit3.6))
 
 row.names(x0) <- "fit3"
 row.names(x1) <- "fit3.1"
@@ -497,5 +782,15 @@ row.names(x2) <- "fit3.2"
 row.names(x3) <- "fit3.3"
 row.names(x4) <- "fit3.4"
 row.names(x5) <- "fit3.5"
-fit3x_R2 <- rbind(x0,x1,x2,x3,x4,x5)
-rm(x0,x1,x2,x3,x4,x5)
+row.names(x6) <- "fit3.6"
+(fit3x_R2 <- rbind(x0,x1,x2,x3,x4,x5,x6))
+rm(x0,x1,x2,x3,x4,x5,x6)
+
+# Model 3.5 seems a good enough fit.
+# identify changepoints for fit 3.5 ####
+
+
+
+unlist(tictoc::tic.log())
+
+
