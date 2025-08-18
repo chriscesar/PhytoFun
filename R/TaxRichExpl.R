@@ -593,6 +593,7 @@ pp_check(fit3.6,
          ndraws = 300,
          alpha=0.25
          )
+
 toc(log=TRUE)
 
 tic("fit3.6 plots")
@@ -615,7 +616,11 @@ df_S_Annual %>%
   labs(
     title = "Mean taxon richness over time by river basin district",
     y = "Taxon richness",
-    caption = "Bold lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals"
+    caption = paste0("Bold lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals\n",
+                     "Model formula: (",fit3.6$formula,", ",as.character(fit3.6$formula)[2],")\n",
+                     "Family: ",fit3.6$family,"\n",
+                     "Chains: ",summ_fit3.6$chains,"; Iterations: ",summ_fit3.6$iter,"\n",
+                     "R-sq: ",round(bayes_R2(fit3.6)[,"Estimate"]*100,2),"%")
   )+
   facet_wrap(. ~ rbd)+
   theme(
