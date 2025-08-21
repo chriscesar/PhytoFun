@@ -59,9 +59,11 @@ df0_raw %>%
     values_fill = 0
     ) -> dfw
 
-# calculate taxon richness & append to wide data
+# calculate taxon richness & Abundance & append to wide data
 S <- vegan::specnumber(dfw[,-c(1:10)])  
-dfw$S <- S;rm(S)
+N <- rowSums(dfw[,-c(1:10)])
+dfw$S <- S; rm(S)
+dfw$N <- N; rm(N)
 
 # create annual summary for modelling ####
 dfw %>% 
@@ -77,7 +79,8 @@ dfw %>%
     surveillan,
     eastings,
     northings,
-    S
+    S,
+    N
   ) %>% 
   dplyr::mutate(year = lubridate::year(sample_date)) %>% 
   dplyr::select(-c(sample_date,
@@ -91,10 +94,12 @@ dfw %>%
                    site_id
   )
   ) %>% 
-  group_by(across(-S)) %>% 
+  group_by(across(-c(S, N))) %>% 
   summarise(S = mean(S, na.rm = TRUE),
+            N = mean(N, na.rm = TRUE),
             .groups = "drop") %>% ungroup() -> df_S_Annual
 
+# TAXON RICHNESS DATA ####
 # throw away WBs with fewer than this number of samples:
 number <- 500
 dfw %>% 
@@ -793,6 +798,409 @@ rm(x0,x1,x2,x3,x4,x5,x6)
 
 # Model 3.5 seems a good enough fit.
 # identify changepoints for fit 3.5 ####
+
+############
+# DENSITY DATA ####
+# throw away WBs with fewer than this number of samples:
+number <- 500
+dfw %>% 
+  dplyr::filter(N > 0) %>% # remove zero S values
+  dplyr::filter(sample_date > "2008-01-01") %>% 
+  dplyr::group_by(wb_name) %>%
+  dplyr::filter(n() >= number) %>% ungroup() %>% 
+  ggplot(aes(
+    x = sample_date,
+    y = log10(N)
+  )
+  ) +
+  geom_point()+
+  facet_wrap(.~wb_name)+
+  geom_smooth(
+    method = "gam"
+  )
+
+### fit 3.5N ####
+tic("fit3.5N") #truncated gaussian
+# fit3.5N <- brms::brm(bf(log(N)|trunc(lb = 0) ~ s(I(year - 2008))+rbd,
+#                        sigma ~ rbd),
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 10000,
+#                     warmup = 3000)
+# saveRDS(fit3.5N, file = "outputs/models/03.5brmsSimple_N.Rdat")
+fit3.5N <- readRDS("outputs/models/03.5brmsSimple_N.Rdat")
+toc(log=TRUE)
+
+tic("fit3.5 summaries")
+(summ_fit3.5N <- summary(fit3.5N))
+pp_check(fit3.5N,
+         # ndraws = 800,
+         ndraws = 300,
+         alpha=0.15
+)
+toc(log=TRUE)
+
+tic("fit3.5N plots")
+df_S_Annual %>%
+  group_by(rbd) %>%
+  add_predicted_draws(fit3.5N) %>%
+  ggplot(aes(x = year, y = log(N),
+             # color = ordered(rbd),
+             # fill = ordered(rbd),
+             # shape = rbd
+  )) +
+  stat_lineribbon(
+    aes(y = .prediction),
+    .width = c(.95, .80, .50),
+    alpha = 0.3,
+    show.legend = FALSE
+  ) +
+  scale_fill_brewer(palette = "Greys") +
+  geom_point(data = df_S_Annual) +
+  labs(
+    title = "Mean log(phytoplankton density) over time by river basin district",
+    y = "Log10(Phytoplankton density)",
+    caption = "Bold lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals"
+  )+
+  facet_wrap(. ~ rbd)+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    strip.text = element_text(face=2),
+    axis.text = element_text(face=2)
+  )
+
+df_S_Annual %>%
+  group_by(rbd) %>%
+  add_predicted_draws(fit3.5N) %>%
+  ggplot(aes(x = year, y = log(N),
+             color = ordered(rbd),
+             linetype = ordered(rbd)
+  )) +
+  stat_lineribbon(
+    aes(y = .prediction),
+    .width = 0,
+    #.width = c(.95, .80, .50),
+    # alpha = 0.3,
+    #show.legend = FALSE
+  ) +
+  #scale_fill_brewer(palette="Greys")+
+  scale_color_brewer(palette = "Paired")+
+  scale_linetype_manual(values = c(
+    "solid", "dashed", "dotted", "dotdash",
+    "longdash", "twodash", "solid", "dashed", "dotted"
+  ))+
+  guides(fill = "none")+
+  # ylim(0,NA)+
+  labs(
+    title = "Model-predicted log phytoplankton density over time by river basin district",
+    y = "Log10(Phytoplankton density)",
+    caption = paste0("Lines indicate model predictions\n",
+                     "Model formula: ",fit3.5$formula,"\n",
+                     "Family: ",fit3.5$family,"\n",
+                     "Chains: ",summ_fit3.5N$chains,"; Iterations: ",summ_fit3.5N$iter,"\n",
+                     "R-sq: ",round(bayes_R2(fit3.5)[,"Estimate"]*100,2),"%"),
+    linetype = "River basin district",
+    colour = "River basin district"
+  )+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    strip.text = element_text(face=2),
+    axis.text = element_text(face=2),
+    legend.title = element_text(face=2)
+  )
+toc(log=TRUE)
+
+#### fit3.5N Plot second derivatives ####
+tic("Extract posterior smooths")
+
+##### Extract posterior smooths ####
+year_seq <- seq(min(df_S_Annual$year), max(df_S_Annual$year), length.out = 100)
+
+newdata <- expand_grid(
+  year = year_seq,
+  rbd = unique(df_S_Annual$rbd)
+)
+
+fitted_draws <- fit3.5N |>
+  add_fitted_draws(newdata = newdata, re_formula = NA)
+toc(log = TRUE)
+
+tic("Compute derivatives efficiently")
+##### Compute derivatives efficiently ####
+
+################
+# convert fitted_draws to data table
+tic("Convert to DT")
+setDT(fitted_draws)
+setorder(fitted_draws, rbd, .draw, year)
+fitted_draws[
+  , first_deriv := c(NA_real_, diff(.value) / diff(year)), 
+  by = .(rbd, .draw)
+]
+fitted_draws[
+  , second_deriv := c(NA_real_, diff(first_deriv) / diff(year[-1])), 
+  by = .(rbd, .draw)
+]
+fitted_draws <- fitted_draws[.draw %% 10 == 0]  # keep 1 in 10 draws
+toc(log=TRUE)
+
+###############
+get_derivatives <- function(df) {
+  df |>
+    arrange(year) |>
+    group_by(.draw) |>
+    mutate(
+      first_deriv  = c(NA, diff(.value) / diff(year)),
+      second_deriv = c(NA, diff(first_deriv) / diff(year[-1]))
+    ) |>
+    ungroup()
+}
+tic("calc derivatives")
+deriv_df <- fitted_draws |>
+  group_by(rbd) |>
+  group_modify(~ get_derivatives(.x))
+toc(log=TRUE)
+toc(log=TRUE)
+
+#### Summarise posterior for curvature ####
+tic("Summarise posterior for curvature")
+curvature_summary <- deriv_df |>
+  group_by(rbd, year) |>
+  summarise(
+    mean_curv = mean(second_deriv, na.rm = TRUE),
+    lower     = quantile(second_deriv, 0.025, na.rm = TRUE),
+    upper     = quantile(second_deriv, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+toc(log = TRUE)
+
+tic("Identify changepoints")
+#### Identify changepoints ####
+changepoints <- curvature_summary |>
+  group_by(rbd) |>
+  filter(sign(mean_curv) != lag(sign(mean_curv), default = first(sign(mean_curv)))) |>
+  filter(!between(0, lower, upper))
+toc(log=TRUE)
+
+tic("Plot for diagnosis")
+#### Plot for diagnosis ####
+ggplot(curvature_summary, aes(year, mean_curv)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  facet_wrap(~ rbd)
+toc(log=TRUE)
+
+##################
+### fit 3.6N ####
+tic("fit3.6N") # add factor-smoothed term to allow different trends by rbd
+# fit3.6N <- brms::brm(bf(log(N)|trunc(lb = 0) ~ s(I(year - 2008),
+#                                            rbd,
+#                                            bs = "fs"),
+#                        sigma ~ rbd),
+#                     data = df_S_Annual,
+#                     family = gaussian(),
+#                     chains = 4,
+#                     iter = 10000,
+#                     warmup = 3000)
+# saveRDS(fit3.6N, file = "outputs/models/03.6brmsSimple_N.Rdat")
+fit3.6N <- readRDS("outputs/models/03.6brmsSimple_N.Rdat")
+toc(log=TRUE)
+
+tic("fit3.6N summaries")
+(summ_fit3.6N <- summary(fit3.6N))
+pp_check(fit3.6N,
+         # ndraws = 800,
+         ndraws = 300,
+         alpha=0.25
+)
+
+toc(log=TRUE)
+
+tic("fit3.6N plots")
+df_S_Annual %>%
+  group_by(rbd) %>%
+  add_predicted_draws(fit3.6N) %>%
+  ggplot(aes(x = year, y = log(N),
+             # color = ordered(rbd),
+             # fill = ordered(rbd),
+             # shape = rbd
+  )) +
+  stat_lineribbon(
+    aes(y = .prediction),
+    .width = c(.95, .80, .50),
+    alpha = 0.3,
+    show.legend = FALSE
+  ) +
+  scale_fill_brewer(palette = "Greys") +
+  geom_point(data = df_S_Annual) +
+  labs(
+    title = "Mean log phytoplankton density over time by river basin district",
+    y = "Log(Phytoplankton density)",
+    caption = paste0("Bold lines indicate model prediction, shaded bands represent 50, 80, and 95% credible intervals\n",
+                     "Model formula: (",fit3.6N$formula,", ",as.character(fit3.6N$formula)[2],")\n",
+                     "Family: ",fit3.6N$family,"\n",
+                     "Chains: ",summ_fit3.6N$chains,"; Iterations: ",summ_fit3.6N$iter,"\n",
+                     "R-sq: ",round(bayes_R2(fit3.6N)[,"Estimate"]*100,2),"%")
+  )+
+  facet_wrap(. ~ rbd)+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    strip.text = element_text(face=2),
+    axis.text = element_text(face=2)
+  )
+
+df_S_Annual %>%
+  group_by(rbd) %>%
+  add_predicted_draws(fit3.6N) %>%
+  ggplot(aes(x = year, y = log(N),
+             color = ordered(rbd),
+             linetype = ordered(rbd)
+  )) +
+  stat_lineribbon(
+    aes(y = .prediction),
+    .width = 0,
+    #.width = c(.95, .80, .50),
+    # alpha = 0.3,
+    #show.legend = FALSE
+  ) +
+  #scale_fill_brewer(palette="Greys")+
+  scale_color_brewer(palette = "Paired")+
+  scale_linetype_manual(values = c(
+    "solid", "dashed", "dotdash", "dotted",
+    "longdash", "twodash", "solid", "dashed", "dotted"
+  ))+
+  guides(fill = "none")+
+  # ylim(0,NA)+
+  labs(
+    title = "Model-predicted phytoplankton density over time by river basin district",
+    y = "Log(phytoplankton density)",
+    caption = paste0("Lines indicate model predictions\n",
+                     "Model formula: (",fit3.6N$formula,", ",as.character(fit3.6N$formula)[2],")\n",
+                     "Family: ",fit3.6N$family,"\n",
+                     "Chains: ",summ_fit3.6N$chains,"; Iterations: ",summ_fit3.6N$iter,"\n",
+                     "R-sq: ",round(bayes_R2(fit3.6N)[,"Estimate"]*100,2),"%"),
+    linetype = "River basin district",
+    colour = "River basin district"
+  )+
+  theme(
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    strip.text = element_text(face=2),
+    axis.text = element_text(face=2),
+    legend.title = element_text(face=2)
+  )
+toc(log=TRUE)
+
+#### fit3.6 Plot second derivatives ####
+tic("Extract posterior smooths")
+
+##### Extract posterior smooths ####
+year_seq <- seq(min(df_S_Annual$year), max(df_S_Annual$year), length.out = 100)
+
+newdata <- expand_grid(
+  year = year_seq,
+  rbd = unique(df_S_Annual$rbd)
+)
+
+fitted_draws <- fit3.6N |>
+  add_fitted_draws(newdata = newdata, re_formula = NA)
+toc(log = TRUE)
+
+tic("Compute derivatives efficiently")
+##### Compute derivatives efficiently ####
+
+# convert fitted_draws to data table
+tic("Convert to DT")
+setDT(fitted_draws)
+setorder(fitted_draws, rbd, .draw, year)
+fitted_draws[
+  , first_deriv := c(NA_real_, diff(.value) / diff(year)), 
+  by = .(rbd, .draw)
+]
+fitted_draws[
+  , second_deriv := c(NA_real_, diff(first_deriv) / diff(year[-1])), 
+  by = .(rbd, .draw)
+]
+fitted_draws <- fitted_draws[.draw %% 10 == 0]  # keep 1 in 10 draws
+toc(log=TRUE)
+
+get_derivatives <- function(df) {
+  df |>
+    arrange(year) |>
+    group_by(.draw) |>
+    mutate(
+      first_deriv  = c(NA, diff(.value) / diff(year)),
+      second_deriv = c(NA, diff(first_deriv) / diff(year[-1]))
+    ) |>
+    ungroup()
+}
+tic("calc derivatives")
+deriv_df <- fitted_draws |>
+  group_by(rbd) |>
+  group_modify(~ get_derivatives(.x))
+toc(log=TRUE)
+toc(log=TRUE)
+
+#### Summarise posterior for curvature ####
+tic("Summarise posterior for curvature")
+curvature_summary <- deriv_df |>
+  group_by(rbd, year) |>
+  summarise(
+    mean_curv = mean(first_deriv, na.rm = TRUE),
+    lower     = quantile(first_deriv, 0.025, na.rm = TRUE),
+    upper     = quantile(first_deriv, 0.975, na.rm = TRUE),
+    # mean_curv = mean(second_deriv, na.rm = TRUE),
+    # lower     = quantile(second_deriv, 0.025, na.rm = TRUE),
+    # upper     = quantile(second_deriv, 0.975, na.rm = TRUE),
+    .groups = "drop"
+  )
+
+toc(log = TRUE)
+
+tic("Identify changepoints")
+#### Identify changepoints ####
+changepoints <- curvature_summary |>
+  group_by(rbd) |>
+  filter(sign(mean_curv) != lag(sign(mean_curv), default = first(sign(mean_curv)))) |>
+  filter(!between(0, lower, upper))
+toc(log=TRUE)
+
+tic("Plot for diagnosis")
+
+#### Plot for diagnosis ####
+ggplot(curvature_summary, aes(year, mean_curv)) +
+  geom_ribbon(aes(ymin = lower, ymax = upper), alpha = 0.2) +
+  geom_line() +
+  geom_hline(yintercept = 0, linetype = "dashed") +
+  labs(
+    ### first derivatives
+    title = "First derivatives of taxon richness over time",
+    #first derivatives
+    subtitle = "Visualisation of rates of change over time.\nPositive first derivatives indicate increasing taxon richness, negative values indicate decreasing taxon richness"
+    ## second derivatives
+    # title = "Second derivatives of taxon richness over time",
+    # ## second derivatives
+    # subtitle = "Visualisation of rates of change over time.\nPositive second derivatives indicate accelerating change, negative values indicate decelerating change, and zero values indicate a constant rate of change"
+  )+
+  facet_wrap(~ rbd)
+toc(log=TRUE)
+
+
+
+
+
+
+
+
+
+
+
 
 
 
