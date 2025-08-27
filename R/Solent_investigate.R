@@ -563,7 +563,7 @@ theme(
 
 # by taxon ####
 
-plnk <- "Pseudo-nitzschia"
+plnk <- "Other phytoplankton"
 mxCells <- log10(max(df0_raw$cells_per_m3[df0_raw$name_use == plnk],
                      na.rm = TRUE))
 
