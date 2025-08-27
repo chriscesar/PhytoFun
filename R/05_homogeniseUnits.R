@@ -264,3 +264,137 @@ median(log10(dfall_use$md_carb_ugC_per_m3),na.rm=TRUE)
 dfall_use %>% 
   group_by(data_set) %>% 
   summarise(log10(median(md_carb_ugC_per_m3+1,na.rm=TRUE)))
+
+## Mean C ####
+dfall_use %>% 
+  ## generate month for plotting
+  dplyr::mutate(month = lubridate::month(sample_date)) %>% 
+  dplyr::select(region,wb_id,wb,wb_type,biosys_short,
+                sample_date, month, data_set,
+                abundance_m3, mn_carb_ugC_per_m3,md_carb_ugC_per_m3) %>% 
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  dplyr::group_by(across(c(
+    -abundance_m3,
+    -mn_carb_ugC_per_m3,
+    -md_carb_ugC_per_m3))) %>% 
+  dplyr::summarise(abundance_m3 = sum(abundance_m3, na.rm = TRUE),
+                   mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3, na.rm = TRUE),
+                   md_carb_ugC_per_m3 = sum(md_carb_ugC_per_m3, na.rm = TRUE),
+                   .groups = "drop") %>% ungroup() %>% 
+  dplyr::select(-sample_date) %>% 
+  dplyr::group_by(across(c(
+    -abundance_m3,
+    -mn_carb_ugC_per_m3,
+    -md_carb_ugC_per_m3))) %>% 
+  # names()
+  dplyr::summarise(abundance_m3 = mean(abundance_m3, na.rm = TRUE),
+                   mn_carb_ugC_per_m3 = mean(mn_carb_ugC_per_m3, na.rm = TRUE),
+                   md_carb_ugC_per_m3 = mean(md_carb_ugC_per_m3, na.rm = TRUE),
+                   .groups = "drop") %>% ungroup() %>% 
+  dplyr::mutate(regn_wb_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb))) %>%
+  dplyr::mutate(regn_wb_biosys_lbl = paste0(vegan::make.cepnames(region),
+                                            "_",
+                                            vegan::make.cepnames(wb),
+                                            "_",
+                                            biosys_short)) %>%
+  dplyr::mutate(regn_wb_lbl = factor(regn_wb_lbl,
+                                     levels = unique(regn_wb_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::mutate(regn_wb_biosys_lbl = factor(regn_wb_biosys_lbl,
+                                            levels = unique(regn_wb_biosys_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::filter(data_set=="Phytoplankton") %>% 
+  ggplot(., aes(x = month,
+                y = mn_carb_ugC_per_m3,
+                # colour = data_set,
+                shape = data_set,
+                fill = data_set
+  )) +
+  geom_point() +
+  scale_fill_manual(values=c("green","blue"))+
+  scale_shape_manual(values = c(21,24))+
+  facet_wrap(.~regn_wb_biosys_lbl, scales = "free_y")
+
+######
+## ts vs individual carbon contents: selected taxa ####
+n <- 20 # how many rows does the data need to allow plotting
+dfall_use %>% 
+  dplyr::select(region,wb_id,wb,wb_type,biosys_short,
+                sample_date, data_set, lifeform,
+                abundance_m3, mn_carb_ugC_per_m3,md_carb_ugC_per_m3) %>% 
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  dplyr::group_by(across(c(
+    -abundance_m3,
+    -mn_carb_ugC_per_m3,
+    -md_carb_ugC_per_m3))) %>% 
+  dplyr::summarise(abundance_m3 = sum(abundance_m3, na.rm = TRUE),
+                   mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3, na.rm = TRUE),
+                   md_carb_ugC_per_m3 = sum(md_carb_ugC_per_m3, na.rm = TRUE),
+                   .groups = "drop") %>% 
+  dplyr::mutate(regn_wb_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb))) %>%
+  dplyr::mutate(regn_wb_biosys_lbl = paste0(vegan::make.cepnames(region),
+                                            "_",
+                                            vegan::make.cepnames(wb),
+                                            "_",
+                                            biosys_short)) %>%
+  dplyr::mutate(regn_wb_lbl = factor(regn_wb_lbl,
+                                     levels = unique(regn_wb_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::mutate(regn_wb_biosys_lbl = factor(regn_wb_biosys_lbl,
+                                            levels = unique(regn_wb_biosys_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::filter(
+    lifeform == "Diatom"|lifeform == "Dinoflagellate"|lifeform == "Protozoa"
+    ) %>% 
+  dplyr::mutate(
+    yday = lubridate::yday(sample_date),
+    month = lubridate::month(sample_date)
+    ) %>% 
+  dplyr::group_by(regn_wb_biosys_lbl) %>% 
+  dplyr::filter(n() >= n) %>% ungroup() %>% 
+  ### SMOOTHED TS #####
+  # ggplot(., aes(x = yday,
+  #               y = log10(mn_carb_ugC_per_m3+1),
+  #               colour = lifeform,
+  #               shape = lifeform,
+  #               fill = lifeform
+  #               )) +
+  # geom_point(colour=1) +
+  # geom_smooth(method="gam",se=FALSE)+
+  # scale_fill_manual(values=c("green","blue","red"))+
+  # scale_colour_manual(values=c("green","blue","red"))+
+  # scale_shape_manual(values = c(21,24, 23))+
+  # facet_wrap(.~regn_wb_biosys_lbl)
+
+  ### RIDGEPLOT #####
+  ggplot(.,aes(
+    x = log10(mn_carb_ugC_per_m3+1),
+    y = as.factor(month),
+    fill = lifeform
+  ))+
+  ggridges::geom_density_ridges() +
+  scale_fill_manual(values=c("palegreen","lightblue","hotpink1"))+
+  facet_wrap(.~lifeform, ncol=3)
+  ###
+  ### RADAR PLOT ####
+  # ggplot(.,
+  #        aes(
+  #          x = month,
+  #          y = log10(mn_carb_ugC_per_m3+1),
+  #          shape = lifeform,
+  #          fill = lifeform
+  #          )) +
+  # coord_polar(theta = "x", start = 1, direction = -1)+
+  # geom_jitter(width = 0.2, show.legend = FALSE)+
+  # facet_wrap(.~lifeform)+
+  # geom_smooth(method = "gam", show.legend = FALSE)+
+  # theme_light()
+  
