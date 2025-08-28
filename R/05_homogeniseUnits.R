@@ -1,7 +1,7 @@
 # 05_homogeniseUnits.R ####
 
 # load packages ####
-ld_pkgs <- c("tidyverse","tictoc","stringr", "forcats")
+ld_pkgs <- c("tidyverse","tictoc","stringr", "forcats", "patchwork")
 vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
@@ -307,7 +307,7 @@ dfall_use %>%
                                             levels = unique(regn_wb_biosys_lbl[order(region)])
   )
   ) %>% 
-  dplyr::filter(data_set=="Phytoplankton") %>% 
+  # dplyr::filter(data_set=="Phytoplankton") %>% 
   ggplot(., aes(x = month,
                 y = mn_carb_ugC_per_m3,
                 # colour = data_set,
@@ -326,7 +326,6 @@ dfall_use %>%
   dplyr::select(region,wb_id,wb,wb_type,biosys_short,
                 sample_date, data_set, lifeform,
                 abundance_m3, mn_carb_ugC_per_m3,md_carb_ugC_per_m3) %>% 
-  dplyr::filter(sample_date > "2022-06-01") %>% #names()
   dplyr::group_by(across(c(
     -abundance_m3,
     -mn_carb_ugC_per_m3,
@@ -351,40 +350,45 @@ dfall_use %>%
                                             levels = unique(regn_wb_biosys_lbl[order(region)])
   )
   ) %>% 
-  dplyr::filter(
-    lifeform == "Diatom"|lifeform == "Dinoflagellate"|lifeform == "Protozoa"
-    ) %>% 
   dplyr::mutate(
     yday = lubridate::yday(sample_date),
     month = lubridate::month(sample_date)
+  ) -> dfall_use_plots
+
+dfall_use_plots %>% 
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  dplyr::filter(
+    lifeform == "Diatom"|lifeform == "Dinoflagellate"|lifeform == "Protozoa"
     ) %>% 
   dplyr::group_by(regn_wb_biosys_lbl) %>% 
   dplyr::filter(n() >= n) %>% ungroup() %>% 
+  
   ### SMOOTHED TS #####
-  # ggplot(., aes(x = yday,
-  #               y = log10(mn_carb_ugC_per_m3+1),
-  #               colour = lifeform,
-  #               shape = lifeform,
-  #               fill = lifeform
-  #               )) +
-  # geom_point(colour=1) +
-  # geom_smooth(method="gam",se=FALSE)+
-  # scale_fill_manual(values=c("green","blue","red"))+
-  # scale_colour_manual(values=c("green","blue","red"))+
-  # scale_shape_manual(values = c(21,24, 23))+
-  # facet_wrap(.~regn_wb_biosys_lbl)
+  ggplot(., aes(x = yday,
+                y = log10(mn_carb_ugC_per_m3+1),
+                colour = lifeform,
+                shape = lifeform,
+                fill = lifeform
+                )) +
+  geom_point(colour=1) +
+  geom_smooth(method="gam",se=FALSE)+
+  scale_fill_manual(values=c("green","blue","red"))+
+  scale_colour_manual(values=c("green","blue","red"))+
+  scale_shape_manual(values = c(21,24, 23))+
+  facet_wrap(.~regn_wb_biosys_lbl)
 
   ### RIDGEPLOT #####
-  ggplot(.,aes(
-    x = log10(mn_carb_ugC_per_m3+1),
-    y = as.factor(month),
-    fill = lifeform
-  ))+
-  ggridges::geom_density_ridges() +
-  scale_fill_manual(values=c("palegreen","lightblue","hotpink1"))+
-  facet_wrap(.~lifeform, ncol=3)
-  ###
-  ### RADAR PLOT ####
+  # ggplot(.,aes(
+  #   x = log10(mn_carb_ugC_per_m3+1),
+  #   y = as.factor(month),
+  #   fill = lifeform
+  # ))+
+  # ggridges::geom_density_ridges() +
+  # scale_fill_manual(values=c("palegreen","lightblue","hotpink1"))+
+  # facet_wrap(.~lifeform, ncol=3)
+  # # ###
+
+  # ### RADAR PLOT ####
   # ggplot(.,
   #        aes(
   #          x = month,
@@ -392,9 +396,241 @@ dfall_use %>%
   #          shape = lifeform,
   #          fill = lifeform
   #          )) +
-  # coord_polar(theta = "x", start = 1, direction = -1)+
-  # geom_jitter(width = 0.2, show.legend = FALSE)+
-  # facet_wrap(.~lifeform)+
-  # geom_smooth(method = "gam", show.legend = FALSE)+
-  # theme_light()
-  
+  # geom_jitter(width = 0.2, show.legend = FALSE) +
+  # geom_smooth(method = "gam", show.legend = FALSE) +
+  # facet_wrap(~ lifeform) +
+  # coord_polar(theta = "x", start = 0, direction = 1) +
+  # scale_x_continuous(
+  #   breaks = 1:12,
+  #   labels = 1:12,
+  #   expand = c(0, 0)
+  # ) +
+  # theme_light() +
+  # theme(
+  #   panel.grid.major.x = element_line(color = "grey70"),
+  #   panel.grid.minor.x = element_blank(),
+  #   axis.text = element_text(face=2)
+  # )
+
+## Time plots #####
+dfall_use_plots_2 <- dfall_use_plots %>% 
+  dplyr::filter(data_set=="Phytoplankton") %>% 
+  # calculate values for Following lifeforms:
+  # Diatom, Dinoflagellate, Protozoa, Other
+  mutate(
+    lifeform_plot = case_when(
+      lifeform == "Diatom" ~ "Diatom",
+      lifeform == "Dinoflagellate" ~ "Dinoflagellate",
+      lifeform == "Protozoa" ~ "Protozoa",
+      TRUE ~ "Other"
+    )
+  )  %>% 
+  mutate(lifeform_plot = factor(lifeform_plot,
+                                levels = c(
+                                  "Diatom",
+                                  "Dinoflagellate",
+                                  "Protozoa",
+                                  "Other"
+                                  ))) %>% 
+  select(-c(lifeform)) %>% 
+  dplyr::group_by(across(c(
+    -abundance_m3,
+    -mn_carb_ugC_per_m3,
+    -md_carb_ugC_per_m3))) %>% 
+    summarise(
+      abundance_m3 = sum(abundance_m3, na.rm = TRUE),
+      mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3,
+                                       na.rm = TRUE),
+      md_carb_ugC_per_m3=sum(md_carb_ugC_per_m3, na.rm=TRUE),
+      .groups = "drop") %>% ungroup()
+
+
+min_date <- "2007-01-01"
+min(dfall_use_plots_2$sample_date)
+
+#####  TOTAL #####
+dfall_use_plots_2 %>% 
+  mutate(lab="TOTAL") %>% 
+  dplyr::filter(
+    sample_date >= min_date
+  ) %>% 
+  group_by(across(c(-lifeform_plot))) %>% 
+  summarise(
+    abundance_m3 = sum(abundance_m3, na.rm = TRUE),
+    mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3,
+                             na.rm = TRUE),
+    md_carb_ugC_per_m3=sum(md_carb_ugC_per_m3, na.rm=TRUE),
+    .groups = "drop") %>% 
+  dplyr::filter(
+    mn_carb_ugC_per_m3 > 0
+  ) %>% 
+  ggplot(.,
+         aes(
+           x = log10(mn_carb_ugC_per_m3+1),
+           y = as.factor(month)
+         )) +
+  facet_wrap(.~lab)+
+  ggridges::geom_density_ridges(
+    fill = "darkgrey",
+    show.legend = FALSE) +
+  labs(y = "Month",
+       x = bquote(bold(Log[10][(n+1)]~Total~carbon~content~(ug~C~m^-3)))
+  )+
+  theme(
+    strip.text = element_text(face = 2),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face = 2),
+    panel.background = element_rect(fill = "#EEEEEE")
+  ) -> pl1_tot
+
+#####  by LF #####
+dfall_use_plots_2 %>% 
+  dplyr::filter(
+    sample_date >= min_date
+  ) %>% 
+  dplyr::filter(
+    mn_carb_ugC_per_m3 > 0
+  ) %>% 
+  ggplot(.,
+         aes(
+           x = log10(md_carb_ugC_per_m3+1),
+           y = as.factor(month),
+           fill = lifeform_plot
+         )) +
+  ggridges::geom_density_ridges(show.legend = FALSE)+
+  facet_wrap(.~lifeform_plot, ncol = 4)+
+  scale_fill_manual(values=c("palegreen","lightblue",
+                             "hotpink1","azure2"
+                             )) +
+  labs(caption = paste0("Phytoplankton data gathered since ",min_date),
+       x = bquote(bold(Log[10][(n+1)]~Total~carbon~content~(ug~C~m^-3)))
+       )+
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    strip.text = element_text(face = 2)
+  ) -> pl1_lfs
+
+pout0 <- pl1_tot+pl1_lfs+plot_layout(widths = c(1, 4),axes = "collect")
+
+ggsave(plot = pout0,
+       filename = paste0("outputs/figs/AllRegions.tiff"),
+       width = 18, height = 8, units = "in"
+)
+
+## By Region ####
+
+filter_to_filename <- function(filter_expr) {
+  # Turn expression into a character string, remove spaces & special chars
+  expr_text <- rlang::expr_text(filter_expr)
+  expr_text |>
+    gsub(" ", "", x = _) |>
+    gsub("[^A-Za-z0-9_]", "_", x = _)
+}
+
+range(dfall_use_plots_2$sample_date)
+# dat_use <- list(
+#   expr = expr(sample_date >= as.Date("2007-01-01")),
+#   label = "From 01/01/2007 onwards",
+#   filename = "_since_2007_"
+#   )
+
+# dat_use <- list(
+#   expr = expr(sample_date >= as.Date("2007-01-01") & sample_date <= as.Date("2012-12-31")),
+#   label = "01/01/2007 to 31/12/2012",
+#   filename = "_2007_to_2012"
+#   )
+# 
+dat_use <- list(
+  expr = expr(sample_date >= as.Date("2020-01-01") & sample_date <= as.Date("2025-03-15")),
+  label = "01/01/2020 to 15/03/2025",
+  filename = "_2020_to_present_"
+)
+
+unique(dfall_use_plots_2$region)
+# regname <- "Northumbria"
+# regname <- "Humber"
+# regname <- "Anglian"
+# regname <- "Thames"
+# regname <- "South East"
+# regname <- "South West"
+regname <- "North West"
+
+##### TOTAL ####
+dfall_use_plots_2 %>% 
+  mutate(lab="TOTAL") %>% 
+  dplyr::filter(
+    !!dat_use$expr
+  ) %>% 
+  group_by(across(c(-lifeform_plot))) %>% 
+  summarise(
+    abundance_m3 = sum(abundance_m3, na.rm = TRUE),
+    mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3,
+                             na.rm = TRUE),
+    md_carb_ugC_per_m3=sum(md_carb_ugC_per_m3, na.rm=TRUE),
+    .groups = "drop") %>% 
+  dplyr::filter(
+    mn_carb_ugC_per_m3 > 0
+  ) %>% 
+  dplyr::filter(region == regname) %>%
+  ggplot(.,
+         aes(
+           x = log10(mn_carb_ugC_per_m3+1),
+           y = as.factor(month)
+         )) +
+  facet_wrap(.~lab)+
+  ggridges::geom_density_ridges(
+    fill = "darkgrey",
+    show.legend = FALSE) +
+  labs(y = "Month",
+       x = bquote(bold(Log[10][(n+1)]~Total~carbon~content~(ug~C~m^-3)))
+  )+
+  ggtitle(regname)+
+  theme(
+    strip.text = element_text(face = 2),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face = 2),
+    panel.background = element_rect(fill = "#EEEEEE")
+  ) -> pl2_tot_Northumb
+
+#####  by LF #####
+dfall_use_plots_2 %>% 
+  dplyr::filter(
+    !!dat_use$expr
+    ) %>% 
+  dplyr::filter(
+    mn_carb_ugC_per_m3 > 0
+  ) %>% 
+  dplyr::filter(
+    region == regname
+  ) %>% 
+  ggplot(.,
+         aes(
+           x = log10(md_carb_ugC_per_m3+1),
+           y = as.factor(month),
+           fill = lifeform_plot
+         )) +
+  ggridges::geom_density_ridges(show.legend = FALSE)+
+  facet_wrap(.~lifeform_plot, ncol = 4)+
+  scale_fill_manual(values=c("palegreen","lightblue",
+                             "hotpink1","azure2"
+  )) +
+  labs(
+    caption = paste0("Data window: ", dat_use$label),
+    x = bquote(bold(Log[10][(n+1)]~Total~carbon~content~(ug~C~m^-3)))
+  )+
+  theme(
+    axis.title.y = element_blank(),
+    axis.text.y = element_blank(),
+    axis.ticks.y = element_blank(),
+    strip.text = element_text(face = 2)
+  ) -> pl2_lfs_Northumb
+
+pout <- (pl2_tot_Northumb+pl2_lfs_Northumb+
+           plot_layout(widths = c(1, 4),axes = "collect"))
+
+ggsave(plot = pout,
+       filename = paste0("outputs/figs/",regname,"_",dat_use$filename,".tiff"),
+       width = 18, height = 8, units = "in"
+       )
