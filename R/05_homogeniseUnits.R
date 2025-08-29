@@ -634,3 +634,105 @@ ggsave(plot = pout,
        filename = paste0("outputs/figs/",regname,"_",dat_use$filename,".tiff"),
        width = 18, height = 8, units = "in"
        )
+
+## Consolidate into single plots ####
+## for loop to generate images across all regions ####
+
+# Get all unique region values
+regions <- unique(dfall_use_plots_2$region)
+
+# df_region <- dfall_use_plots_2 %>%
+#   filter(region == "Anglian")
+tic("Generate time shift figures")
+for (reg in regions) {
+  
+  # Filter data for the current region
+  df_region <- dfall_use_plots_2 %>%
+    filter(region == reg) %>% 
+    filter(mn_carb_ugC_per_m3 >0)
+  
+  # First plot (total)
+  pl_tot <- df_region %>%
+    mutate(lab = "TOTAL") %>%
+    mutate(
+      BLOCK = case_when(
+        sample_date < ymd("2013-01-01") ~ "Old",
+        sample_date > ymd("2020-01-01") ~ "New",
+        TRUE ~ "Mid"
+      )
+    ) %>%
+    filter(BLOCK != "Mid") %>%
+    ggplot(aes(
+      x = log10(mn_carb_ugC_per_m3 + 1),
+      y = as.factor(month),
+      fill = BLOCK
+    )) +
+    facet_wrap(. ~ lab) +
+    ggridges::geom_density_ridges(
+      alpha = 0.5,
+      show.legend = FALSE
+      ) +
+    labs(
+      y = "Month",
+      x = bquote(bold(Log[10][(n+1)]~Total~carbon~content~(ug~C~m^-3)))
+    )+
+    ggtitle(reg)+
+    theme(
+      strip.text = element_text(face = 2),
+      axis.title.x = element_blank(),
+      axis.title.y = element_text(face = 2),
+      panel.background = element_rect(fill = "#EEEEEE"),
+      legend.title = element_blank()
+    )
+  
+  # Second plot (lifeform)
+  pl_lf <- df_region %>%
+    mutate(
+      BLOCK = case_when(
+        sample_date < ymd("2013-01-01") ~ "Old",
+        sample_date > ymd("2020-01-01") ~ "New",
+        TRUE ~ "Mid"
+      )
+    ) %>%
+    filter(BLOCK != "Mid") %>%
+    ggplot(aes(
+      x = log10(md_carb_ugC_per_m3 + 1),
+      y = as.factor(month),
+      fill = BLOCK
+    )) +
+    ggridges::geom_density_ridges(
+      alpha = 0.5,
+      # jittered_points = TRUE,
+      # position = ggridges::position_points_jitter(width = 0.1, height = -.05),
+      # point_shape = '|', point_size = 2, point_alpha = 1, #alpha = 0.7,
+      # aes(colour = BLOCK)
+      ) +
+    facet_wrap(. ~ lifeform_plot, ncol = 4) +
+    labs(
+      x = bquote(bold(Log[10][(n+1)]~Total~carbon~content~(ug~C~m^-3))),
+      caption = "'New' values from phytoplankton samples gathered since 01/01/2020\n'Old' values gathered between 01/01/2007 and 31/12/2022"
+    )+
+    theme(
+      axis.title.y = element_blank(),
+      axis.text.y = element_blank(),
+      axis.ticks.y = element_blank(),
+      strip.text = element_text(face = 2),
+      legend.title = element_blank()
+    )
+  
+  # Combine plots with patchwork
+  pl <- pl_tot + pl_lf +
+    patchwork::plot_layout(
+      widths = c(1, 4),
+      axes = "collect",
+      guides = "collect"
+    )
+  
+  # Save to file with region in filename
+  out_file <- paste0("outputs/figs/Timeshift_", reg, ".tiff")
+  ggsave(out_file, plot = pl, width = 18, height = 8, dpi = 300)
+  
+  message("Saved plot for region: ", reg)
+  }
+
+toc(log=TRUE)
