@@ -45,3 +45,4 @@ Incorporating phytoplankton abundances and carbon contents.
 * ~Update/sense check subsequent scripts to ensure no errors~
 * ~Apparent under-estimation of phyto carbon (or OVER-estimation of zoops)~
 * ?Clean code into a single script?
+* Link phyto data & zoop data with WIMS data
