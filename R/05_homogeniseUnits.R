@@ -183,10 +183,11 @@ dfall_use %>%
        # caption = "Lines indicate generalised additive model predictions with cyclic cubic spline basis function",
        caption = "Lines indicate generalised additive model predictions with Duchon splines",
        # x="Day of year",
-       x="Date",
+       #x="Date",
        y=bquote(bold(log[10][(n+1)]~Carbon~content)))+
   theme(
-    axis.title = element_text(face=2),
+    axis.title.y = element_text(face=2),
+    axis.title.x = element_blank(),
     strip.text = element_text(face=2),
     legend.title = element_blank()
     )
