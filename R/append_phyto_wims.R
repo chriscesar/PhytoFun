@@ -157,3 +157,231 @@ dftxtrm <- dftxtrm %>%
 ## and widen
 ## do this for both taxa and lifeforms
 
+########################
+## Metadata ####
+
+dfmeta <- dftxtrm %>% 
+  dplyr::select(
+    code,
+    river_basi,
+    wb_id,
+    wb_name,
+    site_id,
+    biosys_code,
+    sample_date,
+    sample_id,
+    wb_type,
+    wb_hm_designation,
+    wb_typology,
+    surveillan
+  ) %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  distinct()
+
+########################
+## Abundance data versions ####
+
+df_abund_taxa_per_l <- dftxtrm %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  dplyr::select(
+    code,
+    sample_id_biosys,
+    name_use,
+    cells_per_litre_millilitre
+  ) %>% 
+  dplyr::group_by(across(-cells_per_litre_millilitre)) %>% 
+  dplyr::summarise(cells_per_litre_millilitre=sum(cells_per_litre_millilitre),
+                   .groups = "drop") %>% 
+  tidyr::pivot_wider(
+    names_from = name_use,
+    values_from = cells_per_litre_millilitre
+  )
+
+df_abund_lf <- dftxtrm %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  dplyr::select(
+    code,
+    sample_id_biosys,
+    phyto_lf,
+    cells_per_litre_millilitre
+  ) %>% 
+  dplyr::group_by(across(-cells_per_litre_millilitre)) %>% 
+  dplyr::summarise(cells_per_litre_millilitre=sum(cells_per_litre_millilitre),
+                   .groups = "drop") %>% 
+  tidyr::pivot_wider(
+    names_from = phyto_lf,
+    values_from = cells_per_litre_millilitre
+  )
+
+df_abund_lf2 <- dftxtrm %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  dplyr::select(
+    code,
+    sample_id_biosys,
+    phyto_lf2,
+    cells_per_litre_millilitre
+  ) %>% 
+  dplyr::group_by(across(-cells_per_litre_millilitre)) %>% 
+  dplyr::summarise(cells_per_litre_millilitre=sum(cells_per_litre_millilitre),
+                   .groups = "drop") %>% 
+  tidyr::pivot_wider(
+    names_from = phyto_lf2,
+    values_from = cells_per_litre_millilitre
+  )
+########################
+## Carbon data versions ####
+df_carb_taxa_md_pg_per_l <- dftxtrm %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  dplyr::select(
+    code,
+    sample_id_biosys,
+    name_use,
+    tot_md_c_pg_c_per_l
+  ) %>% 
+  dplyr::group_by(across(-tot_md_c_pg_c_per_l)) %>% 
+  dplyr::summarise(tot_md_c_pg_c_per_l=sum(tot_md_c_pg_c_per_l),
+                   .groups = "drop") %>% 
+  tidyr::pivot_wider(
+    names_from = name_use,
+    values_from = tot_md_c_pg_c_per_l
+  )
+
+df_carb_lf_md_pg_per_l <- dftxtrm %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  dplyr::select(
+    code,
+    sample_id_biosys,
+    phyto_lf,
+    tot_md_c_pg_c_per_l
+  ) %>% 
+  dplyr::group_by(across(-tot_md_c_pg_c_per_l)) %>% 
+  dplyr::summarise(tot_md_c_pg_c_per_l=sum(tot_md_c_pg_c_per_l),
+                   .groups = "drop") %>% 
+  tidyr::pivot_wider(
+    names_from = phyto_lf,
+    values_from = tot_md_c_pg_c_per_l
+  )
+
+df_carb_lf2_md_pg_per_l <- dftxtrm %>% 
+  dplyr::rename(sample_id_biosys = sample_id) %>% 
+  dplyr::select(
+    code,
+    sample_id_biosys,
+    phyto_lf2,
+    tot_md_c_pg_c_per_l
+  ) %>% 
+  dplyr::group_by(across(-tot_md_c_pg_c_per_l)) %>% 
+  dplyr::summarise(tot_md_c_pg_c_per_l=sum(tot_md_c_pg_c_per_l),
+                   .groups = "drop") %>% 
+  tidyr::pivot_wider(
+    names_from = phyto_lf2,
+    values_from = tot_md_c_pg_c_per_l
+  )
+
+################
+## WIMS data ####
+tictoc::tic("Reformat WIMS data")
+wimsdat_wb_trm %>% 
+  dplyr::mutate(
+    det_units = paste0(DETE_SHORT_DESC,
+                       "_",
+                       UNIT_SHORT_DESC)) %>%
+  dplyr::mutate(
+    det_units = snakecase::to_snake_case(det_units)
+  ) %>% 
+  ## remove ODD samples which flag as duplicates
+  dplyr::filter(SAMP_ID != "1568725" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "1563520" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "1564003" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "1568839" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "5196058" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "5198151" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "926030" & det_units != "orthophs_filt_mg_l") %>% 
+  dplyr::filter(SAMP_ID != "926033" & det_units != "orthophs_filt_mg_l") %>% 
+  dplyr::filter(SAMP_ID != "926038" & det_units != "orthophs_filt_mg_l") %>% 
+  dplyr::filter(SAMP_ID != "938194" & det_units != "1_3_dichlor_ug_l") %>% 
+  dplyr::filter(SAMP_ID != "979790" & det_units != "orthophs_filt_mg_l") %>% 
+  dplyr::filter(SAMP_ID != "983856" & det_units != "demeton_s_ug_l") %>% 
+  dplyr::filter(SAMP_ID != "979785" & det_units != "orthophs_filt_mg_l") %>% 
+  dplyr::filter(SAMP_ID != "3295414" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "3295127" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "1563813" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "1568958" & det_units != "123789_hx_cdd_pg_l") %>% 
+  dplyr::filter(SAMP_ID != "1054911" & det_units != "demeton_s_ug_l") %>% 
+  
+  ## sometimes get multiple samples within a WB in a day.  Calculate mean values
+  ## across wbs for each date
+  dplyr::group_by(across(!MEAS_RESULT)) %>% 
+  
+  
+  
+  dplyr::mutate(
+    result = if_else(
+      is.na(MEAS_SIGN),
+      as.character(MEAS_RESULT),
+      paste(MEAS_SIGN, MEAS_RESULT)
+      )
+    ) %>%
+  # dplyr::select(-c(DETE_SHORT_DESC,
+  #                  UNIT_SHORT_DESC,
+  #                  SAMP_CONFIDENTIAL,
+  #                  SAMP_MATERIAL,
+  #                  DATE_TIME,
+  #                  RIVER_BASI,
+  #                  notation,
+  #                  MEAS_SIGN,
+  #                  MEAS_RESULT,
+  #                  MEAS_ANAL_METH_CODE,
+  #                  MEAS_DETERMINAND_CODE,
+  #                  MEAS_LIMITS,
+  #                  res,
+  #                  wims_region,
+  #                  time_period,
+  #                  material_type,
+  #                  sample_date,
+  #                  WBID,
+  #                  WBName,
+  #                  Type,
+  #                  EA_AREA_NA
+  #                  )
+  #               ) %>%
+  dplyr::select(
+    SAMP_SMPT_USER_REFERENCE,
+    SAMP_ID,
+    #SAMP_PURPOSE_CODE,
+    code,
+    det_units,
+    result
+  ) %>% 
+  # ## remove ODD samples which flag as duplicates
+  # dplyr::filter(SAMP_ID != "1568725" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "1563520" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "1564003" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "1568839" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "5196058" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "5198151" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "926030" & det_units != "orthophs_filt_mg_l") %>% 
+  # dplyr::filter(SAMP_ID != "926033" & det_units != "orthophs_filt_mg_l") %>% 
+  # dplyr::filter(SAMP_ID != "926038" & det_units != "orthophs_filt_mg_l") %>% 
+  # dplyr::filter(SAMP_ID != "938194" & det_units != "1_3_dichlor_ug_l") %>% 
+  # dplyr::filter(SAMP_ID != "979790" & det_units != "orthophs_filt_mg_l") %>% 
+  # dplyr::filter(SAMP_ID != "983856" & det_units != "demeton_s_ug_l") %>% 
+  # dplyr::filter(SAMP_ID != "979785" & det_units != "orthophs_filt_mg_l") %>% 
+  # dplyr::filter(SAMP_ID != "3295414" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "3295127" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "1563813" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "1568958" & det_units != "123789_hx_cdd_pg_l") %>% 
+  # dplyr::filter(SAMP_ID != "1054911" & det_units != "demeton_s_ug_l") %>% 
+  
+  
+  tidyr::pivot_wider(
+    names_from = det_units,
+    values_from = result
+  ) -> dfwims
+
+toc(log=TRUE)
+
+# dfwims_tmp|>
+#   dplyr::summarise(n = dplyr::n(), .by = c(SAMP_SMPT_USER_REFERENCE, SAMP_ID, SAMP_PURPOSE_CODE, code,
+#                                            det_units)) |>
+#   dplyr::filter(n > 1L) 
