@@ -361,8 +361,11 @@ df0_raw %>%
       log10(ratio_md_carbon_tot_mg_c_per_m3) > 0  ~ "Above",
       log10(ratio_md_carbon_tot_mg_c_per_m3) < 0  ~ "Below",
       log10(ratio_md_carbon_tot_mg_c_per_m3) == 0 ~ "Zero")) %>% 
-  group_by(wb_name) %>% dplyr::filter(n() >= number) %>% ungroup() %>% 
-  dplyr::filter(sample_date > "2008-01-01") %>% 
+  group_by(wb_name) %>%
+  #dplyr::filter(n() >= number) %>% 
+  ungroup() %>% 
+  dplyr::filter(sample_date > "2015-01-01") %>% 
+  dplyr::filter(rbd == "Thames") %>% 
   ggplot(aes(
     x = sample_date,
     y = log10(ratio_md_carbon_tot_mg_c_per_m3)
@@ -372,14 +375,15 @@ df0_raw %>%
     aes(colour = gtr0), show.legend = FALSE,
     alpha = 0.25
   )+
-  facet_wrap(.~rbd)+
+  # facet_wrap(.~rbd)+
+  facet_wrap(.~wb_name)+
   geom_smooth(
     method="gam",
     se=TRUE
     )+
   geom_hline(yintercept = log10(1))+
   labs(title =
-         bquote(bold(Ratio~of~log[10]~carbon~content~'in'~diatoms~taxa~to~that~'in'~donoflagellates)),
+         bquote(bold(Ratio~of~log[10]~carbon~content~'in'~diatoms~taxa~to~that~'in'~dinoflagellates)),
        y= bquote(bold(Log[10]~ratio~of~diatom~carbon~to~dinoflagellate~carbon)
                  ),
        caption="Blue line indicates GAM smoother\nOnly samples where both diatoms and dinoflagellates were recorded are displayed",
