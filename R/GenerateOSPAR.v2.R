@@ -18,8 +18,8 @@ source("R/helperFunctions.R")
 # df0 <- readxl::read_xlsx("data/Phyto_2000_2025.xlsx",sheet = "PhyoData",
 #                                guess_max = 2000) %>% 
 #   janitor::clean_names()
-# saveRDS(janitor::clean_names(df_phyto0), file = "outputs/ospar_Phyto_2000_2025.raw.Rdat")
-# tictic::toc(log = TRUE)
+# saveRDS(janitor::clean_names(df0), file = "outputs/ospar_Phyto_2000_2025.raw.Rdat")
+# tictoc::toc(log = TRUE)
 
 df0 <- readRDS("outputs/ospar_Phyto_2000_2025.raw.Rdat")
 
@@ -362,11 +362,12 @@ dfout %>%
   ) -> dfout_exp
 tictoc::toc(log = TRUE)
 
+tictoc::tic("housekeeping & tidy up")
 # housekeeping & tidy up ####
 dfout_exp %>% 
-  ## arrange for consistent outputs ####
+  ## arrange for consistent outputs ##
 dplyr::arrange(SDATE,SMPNO,SPECI) %>% 
-  ## 1) ----------- Remove NA values in VALUE ####
+  ## 1) ----------- Remove NA values in VALUE 
   dplyr::filter(.,!is.na(VALUE)) %>% 
   ## 2) ----------- Sum repeated taxa within samples
   dplyr::group_by(dplyr::across(!VALUE)) %>% 
@@ -384,7 +385,34 @@ dplyr::arrange(SDATE,SMPNO,SPECI) %>%
   dplyr::mutate(STATN = stringr::str_squish(STATN)) %>% 
   # 3.3 truncate station names to 50 characters
   dplyr::mutate(STATN = substr(STATN, 1,50)
+                ) -> df_exp_tweak0
+
+tictoc::toc(log = TRUE)
+
+tictoc::tic("Post-QA tidy up")
+# Post-QA tidy up ####
+df_exp_tweak0 %>% 
+  ## remove zero values
+  dplyr::filter(VALUE != 0) %>% 
+  
+  ### following QA outputs 15/01/2026
+  
+  ## delete duplicated data from 2001 data
+  ## remove SMPNO values 525986 & 534858
+  dplyr::filter(!SMPNO %in% c(525986,534858)) %>% 
+  ## delete presence-only data from 2013 data
+  ## remove SMPNO values 683218, 689476, 687282, 688206, 694214
+  dplyr::filter(!SMPNO %in% c(683218, 689476, 687282, 688206, 694214)) %>%
+  ## delete presence-only data from 2014 data
+  ## remove SMPNO values 697047, 705256, 706771, 709558
+  dplyr::filter(!SMPNO %in% c(697047, 705256, 706771, 709558)
+                ) %>% 
+  ### following QA outputs 16/01/2026
+  ## remove SMPNO values 528114, 528124, 694220
+  dplyr::filter(!SMPNO %in% c(528114, 528124, 694220)
                 ) -> df_exp_tweak
+
+tictoc::toc(log=TRUE)
 
 tictoc::tic("Write data")
 write.csv(
