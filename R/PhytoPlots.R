@@ -128,7 +128,10 @@ rowkeep <- random_logical_vector(n = n, k=k)
 ## subsample data
 X_scaled_sub <- X_scaled[rowkeep,]
 Y_sub <- Y[rowkeep,]
+Y_sub <- Y_sub %>% select(where(~ sum(.x) != 0))#remove empty columns
 meta_sub <- df$meta_use[rowkeep,]
+
+# remove empty taxa from subsample
 
 tic("Fit Unconstrained model")
 ## Fit unconstrained GLLVM ####
@@ -137,16 +140,16 @@ runs <- 1
 
 ### Negative Binomial ####
 sDsn <- data.frame(WB = meta_sub$WB_NAME)
-# m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
-#                  studyDesign = sDsn,
-#                  row.eff = ~(1|WB),
-#                  family = "negative.binomial",
-#                  starting.val="res",
-#                  n.init = runs, #re-run model to get best fit
-#                  # trace=TRUE,
-#                  # seed = 123,
-#                  num.lv = 2
-# )
+m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
+                 studyDesign = sDsn,
+                 row.eff = ~(1|WB),
+                 family = "negative.binomial",
+                 starting.val="res",
+                 n.init = runs, #re-run model to get best fit
+                 # trace=TRUE,
+                 # seed = 123,
+                 num.lv = 2
+)
 
 saveRDS(
   m_lvm_0,
