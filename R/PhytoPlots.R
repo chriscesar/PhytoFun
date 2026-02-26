@@ -3,13 +3,24 @@
 # Investigate Solent data
 
 # load packages ####
-ld_pkgs <- c("tidyverse","tictoc","stringr")
+ld_pkgs <- c("tidyverse","tictoc","stringr","gllvm")
 vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
 tictoc::tic.clearlog() ##clear log
 
 source("R/000setup.R")
+
+## define random vector function ####
+random_logical_vector <- function(n, k) {
+  if (k > n) stop("k cannot be greater than n")
+  
+  # Create vector with k TRUEs and (n-k) FALSEs
+  vec <- c(rep(TRUE, k), rep(FALSE, n - k))
+  
+  # Randomly shuffle the vector
+  sample(vec)
+}
 
 # load data ####
 tic("Load data")
@@ -108,13 +119,26 @@ Y <- df$abund_use %>% dplyr::select(-STNNO,-SMPNO)
 
 toc(log=TRUE)
 
+# Generate subsample of data for analysis ####
+# set seed for replicability
+set.seed(pi)
+n <- nrow(Y) # total number of rows in data
+k <- 700 # how many samples should I extract?
+rowkeep <- random_logical_vector(n = n, k=k)
+
+## subsample data
+X_scaled_sub <- X_scaled[rowkeep,]
+Y_sub <- Y[rowkeep,]
+meta_sub <- df$meta_use[rowkeep,]
+
 tic("Fit Unconstrained model")
 ## Fit unconstrained GLLVM ####
 ## set model options
 runs <- 1
+
 ### Negative Binomial ####
-sDsn <- data.frame(WB = df$meta_use$WB_NAME)
-m_lvm_0 <- gllvm(as.matrix(Y), # unconstrained model
+sDsn <- data.frame(WB = meta_sub$WB_NAME)
+m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
                  studyDesign = sDsn,
                  row.eff = ~(1|WB),
                  family = "negative.binomial",
