@@ -112,8 +112,7 @@ df$wims_use %>%
   ) -> X
 
 ### create scaled version for comparison of effects on model
-X %>% 
-  mutate_if(is.numeric,scale) -> X_scaled
+X_scaled <- as.data.frame(scale(X))
 
 Y <- df$abund_use %>% dplyr::select(-STNNO,-SMPNO)
 
@@ -138,7 +137,35 @@ runs <- 1
 
 ### Negative Binomial ####
 sDsn <- data.frame(WB = meta_sub$WB_NAME)
-m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
+# m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
+#                  studyDesign = sDsn,
+#                  row.eff = ~(1|WB),
+#                  family = "negative.binomial",
+#                  starting.val="res",
+#                  n.init = runs, #re-run model to get best fit
+#                  # trace=TRUE,
+#                  # seed = 123,
+#                  num.lv = 2
+# )
+
+saveRDS(
+  m_lvm_0,
+  file="outputs/models/gllvm_longterm/gllvm_phyto_abund_negbin_uncond.Rdat"
+  )#404.73sec
+toc(log=TRUE)
+
+m_lvm_0 <- readRDS(
+  file="outputs/models/gllvm_longterm/gllvm_phyto_abund_negbin_uncond.Rdat"
+  )
+
+tic("Fit Constrained model")
+## Fit Constrained GLLVM ####
+### Negative Binomial ####
+sDsn <- data.frame(WB = meta_sub$WB_NAME)
+m_lvm_4 <- gllvm(as.matrix(Y_sub), # unconstrained model
+                 X = X_scaled_sub,
+                 formula = ~chla + nh4 + no3 + no2 + spm + sal_ppt +
+                   o2_dis_mll + tempC,
                  studyDesign = sDsn,
                  row.eff = ~(1|WB),
                  family = "negative.binomial",
@@ -148,12 +175,12 @@ m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
                  # seed = 123,
                  num.lv = 2
 )
-
 saveRDS(
-  m_lvm_0,
-  file="outputs/models/gllvm_longterm/gllvm_phyto_abund_negbin_uncond.Rdat"
-  )
+  m_lvm_4,
+  file="outputs/models/gllvm_longterm/gllvm_phyto_abund_negbin_cond.Rdat"
+)
 toc(log=TRUE)
+
 saveRDS(unlist(tictoc::tic.log()),
         file="outputs/models/gllvm_longterm/tic_log.Rdat"
         )
