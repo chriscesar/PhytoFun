@@ -10,7 +10,7 @@ rm(ld_pkgs)
 tictoc::tic.clearlog() ##clear log
 
 source("R/000setup.R")
-
+outfol <- "//prodds.ntnl/Shared/AN/KFH/Groups/N_Marine/02 Projects_Tasks/04 E&B/Ecology and Ecosystems/Planktonic_Food_Webs/202602_FigsForReport/"
 ## define random vector function ####
 random_logical_vector <- function(n, k) {
   if (k > n) stop("k cannot be greater than n")
@@ -152,7 +152,7 @@ m_lvm_0 <- gllvm(as.matrix(Y_sub), # unconstrained model
                  family = "negative.binomial",
                  starting.val="res",
                  n.init = runs, #re-run model to get best fit
-                 # trace=TRUE,
+                 trace=TRUE,
                  # seed = 123,
                  num.lv = 2
 )
@@ -180,7 +180,7 @@ m_lvm_4 <- gllvm(as.matrix(Y_sub), # unconstrained model
                  family = "negative.binomial",
                  starting.val="res",
                  n.init = runs, #re-run model to get best fit
-                 # trace=TRUE,
+                 trace=TRUE,
                  # seed = 123,
                  num.lv = 2
 )
@@ -347,6 +347,12 @@ AIC(m_lvm_0,m_lvm_4)
         plot.caption = ggtext::element_markdown(size = 11)
       )
     ))
+
+png(file = paste0(outfol,"phyto_gllvm_coef_all.png"),
+    width=18*ppi, height=12*ppi, res=ppi)
+print(final_plot)
+dev.off()
+
 
 par(mfrow=c(1,1))
 VP <- varPartitioning(m_lvm_4)
