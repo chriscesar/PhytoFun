@@ -1,6 +1,13 @@
 # loadWIMS.R ####
 # load data from WIMS ####
 
+# load packages ####
+ld_pkgs <- c("tidyverse","arrow","tictoc")
+vapply(ld_pkgs, library, logical(1L),
+       character.only = TRUE, logical.return = TRUE)
+rm(ld_pkgs)
+
+
 dfwimsSites <- readxl::read_xlsx("data/all.saline.sites_WBs_EastNorth.xlsx",
                                  sheet = "SalineSitesJoined",
                                  guess_max = 10000
@@ -49,7 +56,7 @@ hms.data.est <-
   wims.est |>
   filter(notation %in% site.list$notation) %>%
   filter(time_period != 1) %>% 
-  filter(DATE_TIME > "2000-01-01 00:00:00") %>% 
+  # filter(DATE_TIME > "2000-01-01 00:00:00") %>% 
   # & MEAS_DETERMINAND_CODE %in%  c('0076', '0180')) %>%
   collect()
 
@@ -57,7 +64,7 @@ hms.data.sea <-
   wims.sea |>
   filter(notation %in% site.list$notation) %>%
   filter(time_period != 1) %>% 
-  filter(DATE_TIME > "2000-01-01 00:00:00") %>% 
+  # filter(DATE_TIME > "2000-01-01 00:00:00") %>% 
   # filter(time_period != 1 & MEAS_DETERMINAND_CODE %in%  c('0076', '0180')) %>%
   collect()
 
@@ -88,6 +95,25 @@ rm(dfwimsSites,wimsdat)
 rm(wims.est,wims.sea)
 toc(log=TRUE)
 
+# arrange regions as factor in clockwise from north east ####
+wimsdat_wb %>% 
+  mutate(RIVER_BASI = factor(RIVER_BASI,
+                             levels = c(
+                               "Northumbria",
+                               "Humber",
+                               "Anglian",
+                               "Thames",
+                               "South East",
+                               "South West",
+                               "Severn",
+                               "North West",
+                               "Solway Tweed"
+                               ))) -> wimsdat_wb
+# write to RData and csv ####
+tic("Write export")
+saveRDS(wimsdat_wb, file="outputs/wims_all.RDat")
+write.csv(wimsdat_wb, file="outputs/wims_all.csv",row.names = FALSE)
+toc(log=TRUE)
 # # Trim WIMS data by those '.$code' values in plankton data ####
 # tic("Trim WIMS data by those '.$code' values in plankton data")
 # logics <- wimsdat_wb$code %in% dfsummary_wb$code
