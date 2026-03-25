@@ -89,50 +89,43 @@ df_PN %>%
   select(-MEAS_SIGN) %>% 
   group_by(across(-val_mgl)) %>% 
   summarise(val_mgl = mean(val_mgl),.groups = "drop") %>% ungroup() %>% 
-  
-  # 
-  # # remove annoying dets
-  # filter(DETE_SHORT_DESC != "Nitrate-N") %>% 
-  # filter(DETE_SHORT_DESC != "Nitrite-N") %>% 
-  
-
   pivot_wider(names_from = DETE_SHORT_DESC,
               values_from = val_mgl) -> df_PN_w
 
-View(df_PN_w)  
+# View(df_PN_w)
 
-df_PN_w %>% 
-  ggplot(.,
-         aes(
-           x = sample_date,
-           # y = OrthophsFilt,
-           y=df_PN_w$`Nitrate Filt`,
-         ),
-         )+
-  geom_point()+
-  ggthemes::theme_few()+
-  geom_smooth(method = "gam")+
-  facet_wrap(.~RIVER_BASI,scales = "free_y")+
-  theme(
-    strip.text = element_text(face=2),
-  )
+# df_PN_w %>% 
+#   ggplot(.,
+#          aes(
+#            x = sample_date,
+#            # y = OrthophsFilt,
+#            y=`Nitrate Filt`,
+#          ),
+#          )+
+#   geom_point()+
+#   ggthemes::theme_few()+
+#   geom_smooth(method = "gam")+
+#   facet_wrap(.~RIVER_BASI,scales = "free_y")+
+#   theme(
+#     strip.text = element_text(face=2),
+#   )
 
-df_PN %>% 
-  ggplot(.,
-         aes(
-           x = sample_date,
-           y = log10(val_mgl),
-           colour = DETE_SHORT_DESC
-         ))+
-  ggthemes::theme_few()+
-  geom_point(
-    aes(
-      group=DETE_SHORT_DESC
-    ))+
-  facet_wrap(.~RIVER_BASI,scales = "free_y")+
-  theme(
-    strip.text = element_text(face=2),
-  )
+# df_PN %>% 
+#   ggplot(.,
+#          aes(
+#            x = sample_date,
+#            y = log10(val_mgl),
+#            colour = DETE_SHORT_DESC
+#          ))+
+#   ggthemes::theme_few()+
+#   geom_point(
+#     aes(
+#       group=DETE_SHORT_DESC
+#     ))+
+#   facet_wrap(.~RIVER_BASI,scales = "free_y")+
+#   theme(
+#     strip.text = element_text(face=2),
+#   )
 
 
 ## extract samples which contain values for BOTH OrthophsFilt & Nitrate Filt
@@ -226,3 +219,193 @@ df_PN_w %>%
     y = `Nitrate Filt`
   ))+
   geom_boxplot()
+
+# mol values by RBD by month ####
+df_PN_w %>% 
+  mutate(
+    N = rowSums(across(c(`NH3 filt N`, `Nitrate Filt`, `Nitrite Filt`)), na.rm = TRUE),
+    N_mol_l = N/14010,
+    P_mol_l = OrthophsFilt/30970,
+    N_to_P = N_mol_l/P_mol_l,
+    yday = lubridate::yday(sample_date),
+    ) %>% 
+  ## remove likely typo Nitrate values
+  filter(`Nitrate Filt` < 10) %>%
+  dplyr::select(RIVER_BASI,Type,sample_date,N_to_P) %>% 
+  filter(sample_date>"2006-12-31") %>%
+  # mutate(yyyymm=paste0(year(sample_date),strftime(sample_date,"%m"))) %>% 
+  # relocate(yyyymm,.after = Type) %>% 
+  mutate(date_use = as.Date(paste0(year(sample_date),"-",
+                                   month(sample_date),
+                                   "-01"))) %>% 
+  dplyr::select(-sample_date) %>% 
+  group_by(across(-N_to_P)) %>% 
+  summarise(md_N_to_P = median(N_to_P,na.rm=TRUE),
+            .groups = "drop") %>%
+  ggplot(.,
+         aes(
+           # x=as.numeric(yyyymm),
+           x=date_use,
+           # x=yday,
+           y = md_N_to_P,
+         )
+  )+
+  ggthemes::theme_few()+
+  geom_hline(yintercept = 16, lty=2,col=2)+
+  geom_hline(yintercept = 32, lty=2,col=2)+
+  geom_point(alpha = 0.35,
+             show.legend = FALSE,
+             aes(
+               colour = Type,
+             ))+
+  geom_smooth(method = "gam")+
+  # facet_wrap(RIVER_BASI~Type,
+  #            # scales = "free_y"
+  #            )+
+  facet_wrap2(
+    vars(RIVER_BASI,Type), ncol = 4,
+    strip = strip_nested(bleed = FALSE),
+    scales = "free_y"
+  )+
+  labs(
+    title = "Nitrogen to Phosphorus ratios in coastal and estuarine waters",
+    y = "N:P ratio",
+    subtitle = "Values are monthly median ratios of nitrogen to phosphorous by water body type and River Basin District",
+    caption = "Values represent proportion of N (as mol/l) to P (as mol/l).
+    N values are the summed mg/l concentrations of `NH3 filt N`, `Nitrate Filt`, `Nitrite Filt` divided by 14,101.
+    P values are the concentrations of `Orthophosphate, Filtered as P` (mg/l) divided by 30,970.
+    Blue lines indicate generalised additive model estimates.
+    Dashed red lines show indicative N:P ratios of 16 and 32."
+  ) +
+  # ylim(0,200)+
+  theme(
+    strip.text = element_text(face=2,size = 12),
+    strip.background = element_rect(fill = NA, colour=1),
+    axis.title.x = element_blank(),
+    axis.text.x= element_text(face =2, size =14, angle = 270,vjust=0.5),
+    axis.text.y= element_text(face =2, size =12),
+    axis.title.y = element_text(face=2),
+    plot.caption = element_text(face=1,size=12),
+    plot.title = element_text(face=2,size=16),
+  )
+
+# Total N time series ####
+## mol values by RBD by month ####
+df_PN_w %>% 
+  mutate(
+    N = rowSums(across(c(`NH3 filt N`, `Nitrate Filt`, `Nitrite Filt`)), na.rm = TRUE),
+    N_mol_l = N/14010,
+    yday = lubridate::yday(sample_date),
+  ) %>% 
+  ## remove likely typo Nitrate values
+  filter(`Nitrate Filt` < 10) %>%
+  dplyr::select(RIVER_BASI,Type,sample_date,N_mol_l) %>% 
+  filter(sample_date>"2006-12-31") %>%
+  mutate(date_use = as.Date(paste0(year(sample_date),"-",
+                                   month(sample_date),
+                                   "-01"))) %>% 
+  dplyr::select(-sample_date) %>% 
+  group_by(across(-N_mol_l)) %>% 
+  summarise(md_N_mol_l = median(N_mol_l,na.rm=TRUE),
+            .groups = "drop") %>%
+  ggplot(.,
+         aes(
+           # x=as.numeric(yyyymm),
+           x=date_use,
+           # x=yday,
+           y = md_N_mol_l*1000000,
+         )
+  )+
+  ggthemes::theme_few()+
+  geom_point(alpha = 0.35,
+             show.legend = FALSE,
+             aes(
+               colour = Type,
+             ))+
+  geom_smooth(method = "gam")+
+  # facet_wrap(RIVER_BASI~Type,
+  #            # scales = "free_y"
+  #            )+
+  facet_wrap2(
+    vars(RIVER_BASI,Type), ncol = 4,
+    strip = strip_nested(bleed = FALSE),
+    scales = "free_y"
+  )+
+  labs(
+    title = "Calculated total nitrogen in coastal and estuarine waters",
+    y = "N (umol/l)",
+    subtitle = "Values are monthly median values of nitrogen contents by water body type and River Basin District",
+    caption = "N values are the summed mg/l concentrations of `NH3 filt N`, `Nitrate Filt`, `Nitrite Filt` divided by 14,101.
+    Blue lines indicate generalised additive model estimates."
+  ) +
+  # ylim(0,200)+
+  theme(
+    strip.text = element_text(face=2,size = 12),
+    strip.background = element_rect(fill = NA, colour=1),
+    axis.title.x = element_blank(),
+    axis.text.x= element_text(face =2, size =14, angle = 270,vjust=0.5),
+    axis.text.y= element_text(face =2, size =12),
+    axis.title.y = element_text(face=2),
+    plot.caption = element_text(face=1,size=12),
+    plot.title = element_text(face=2,size=16),
+  )
+
+# Total P time series ####
+## mol values by RBD by month ####
+df_PN_w %>% 
+  mutate(
+    P_mol_l = OrthophsFilt/30970,
+    yday = lubridate::yday(sample_date),
+  ) %>% 
+  ## remove likely typo Nitrate values
+  filter(`Nitrate Filt` < 10) %>%
+  dplyr::select(RIVER_BASI,Type,sample_date,P_mol_l) %>% 
+  filter(sample_date>"2006-12-31") %>%
+  mutate(date_use = as.Date(paste0(year(sample_date),"-",
+                                   month(sample_date),
+                                   "-01"))) %>% 
+  dplyr::select(-sample_date) %>% 
+  group_by(across(-P_mol_l)) %>% 
+  summarise(md_P_mol_l = median(P_mol_l,na.rm=TRUE),
+            .groups = "drop") %>%
+  ggplot(.,
+         aes(
+           # x=as.numeric(yyyymm),
+           x=date_use,
+           # x=yday,
+           y = md_P_mol_l*1000000,
+         )
+  )+
+  ggthemes::theme_few()+
+  geom_point(alpha = 0.35,
+             show.legend = FALSE,
+             aes(
+               colour = Type,
+             ))+
+  geom_smooth(method = "gam")+
+  # facet_wrap(RIVER_BASI~Type,
+  #            # scales = "free_y"
+  #            )+
+  facet_wrap2(
+    vars(RIVER_BASI,Type), ncol = 4,
+    strip = strip_nested(bleed = FALSE),
+    scales = "free_y"
+  )+
+  labs(
+    title = "Calculated total phosphorus in coastal and estuarine waters",
+    y = "P (umol/l)",
+    subtitle = "Values are monthly median values of phosphorous contents by water body type and River Basin District",
+    caption = "P values are the concentrations of `Orthophosphate, Filtered as P` (mg/l) divided by 30,970.
+    Blue lines indicate generalised additive model estimates."
+  ) +
+  # ylim(0,200)+
+  theme(
+    strip.text = element_text(face=2,size = 12),
+    strip.background = element_rect(fill = NA, colour=1),
+    axis.title.x = element_blank(),
+    axis.text.x= element_text(face =2, size =14, angle = 270,vjust=0.5),
+    axis.text.y= element_text(face =2, size =12),
+    axis.title.y = element_text(face=2),
+    plot.caption = element_text(face=1,size=12),
+    plot.title = element_text(face=2,size=16),
+  )
