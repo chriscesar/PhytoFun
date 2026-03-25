@@ -69,6 +69,7 @@ tic("Join phyto data to 'correct' site-WB info & export")
 df0_raw %>% 
   dplyr::select(
     site_id,
+    sample_id,
     biosys_code,
     biosys_short,
     sample_date,
