@@ -66,7 +66,23 @@ dfall_use %>%
   geom_point() +
   scale_fill_manual(values=c("green","blue"))+
   scale_shape_manual(values = c(21,24))+
-  facet_wrap(.~regn_wb_biosys_lbl)
+  facet_wrap(.~regn_wb_biosys_lbl)+
+  theme(
+    plot.title = element_text(face=2),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    axis.text.x = element_text(face=2,size=12),
+    axis.text.y = element_text(face=2,size=10),
+    legend.title = element_blank(),
+    legend.text = element_text(face=2,size=14),
+    strip.text = element_text(face=2),
+    
+  )
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/ts_phytoZoop_C_Wb_all_Tx.tiff"),
+       width = 18, height = 8, units = "in"
+       )
+
 
 ## show 'missing' carbon abundances ####
 dfall_use %>% 
@@ -106,11 +122,19 @@ dfall_use %>%
   xlab("Date")+
   ylab("log10(Abundance)")+
   theme(
-    axis.title = element_text(face=2),
-    strip.text = element_text(face=2),
+    plot.title = element_text(face=2),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    axis.text.x = element_text(face=2,size=12),
+    axis.text.y = element_text(face=2,size=10),
     legend.title = element_blank(),
-    title = element_text(face=2)
-  )
+    legend.text = element_text(face=2,size=12),
+    strip.text = element_text(face=2),
+    )
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/ts_phytoZoop_C_Wb_all_Tx_missing.tiff"),
+       width = 18, height = 8, units = "in"
+       )
 
 ## ts vs total carbon contents ####
 dfall_use %>% 
@@ -186,12 +210,19 @@ dfall_use %>%
        #x="Date",
        y=bquote(bold(log[10][(n+1)]~Carbon~content)))+
   theme(
-    axis.title.y = element_text(face=2),
+    plot.title = element_text(face=2),
     axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    axis.text.x = element_text(face=2,size=12),
+    axis.text.y = element_text(face=2,size=10),
+    legend.title = element_blank(),
+    legend.text = element_text(face=2,size=12),
     strip.text = element_text(face=2),
-    legend.title = element_blank()
-    )
-
+  )
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/ts_phytoZoop_tot_C_Wb.tiff"),
+       width = 18, height = 8, units = "in"
+)
 
 dfall_use %>% 
   # put Regions in 'clockwise' order
@@ -376,7 +407,24 @@ dfall_use_plots %>%
   scale_fill_manual(values=c("green","blue","red"))+
   scale_colour_manual(values=c("green","blue","red"))+
   scale_shape_manual(values = c(21,24, 23))+
-  facet_wrap(.~regn_wb_biosys_lbl)
+  labs(
+    title = "Phytoplankton lifeforms by Julian day",
+      )+
+  facet_wrap(.~regn_wb_biosys_lbl)+
+  theme(
+    plot.title = element_text(face=2),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    axis.text.x = element_text(face=2,size=12),
+    axis.text.y = element_text(face=2,size=10),
+    legend.title = element_blank(),
+    legend.text = element_text(face=2,size=12),
+    strip.text = element_text(face=2),
+  )
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/ts_phyto_lifeform_C_Wb.tiff"),
+       width = 18, height = 8, units = "in"
+       )
 
   ### RIDGEPLOT #####
   # ggplot(.,aes(
@@ -516,9 +564,9 @@ dfall_use_plots_2 %>%
 pout0 <- pl1_tot+pl1_lfs+plot_layout(widths = c(1, 4),axes = "collect")
 
 ggsave(plot = pout0,
-       filename = paste0("outputs/figs/AllRegions.tiff"),
+       filename = paste0("outputs/figs/Phyto_C_lifeform_AllRegions.tiff"),
        width = 18, height = 8, units = "in"
-)
+       )
 
 ## By Region ####
 
