@@ -8,7 +8,7 @@ vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
 tictoc::tic.clearlog() ##clear log
-
+tictoc::tic("TOTAL TIME")
 source("R/helperFunctions.R")
 
 # tictoc::tic("Load_data_exported_from_BOXI_Query")
@@ -66,9 +66,10 @@ blankAPHIA <- read.csv("outputs/MissingAphiaLookupImport.csv") #created manually
 
 tictoc::tic("retrieve record details: non-na")
 # Filter out rows with NA aphia_id
-aphia_ids_non_na <- aphia_ids |> dplyr::filter(!is.na(aphia_id)) %>% 
+aphia_ids_non_na <- aphia_ids %>% 
+  dplyr::filter(!is.na(aphia_id)) %>% 
   dplyr::mutate(
-    RLIST = "PEG_BVOL"
+    RLIST = "ERID"
     )
 
 # For each aphia_id, retrieve record details
@@ -120,7 +121,8 @@ tx <- dfout$taxa_name %>%
   dplyr::rename(speci = value) %>% 
   dplyr::left_join(
     records %>% 
-      dplyr::select(reported_taxon, rlist) %>% 
+      dplyr::select(reported_taxon, rlist,aphia_id,aphia_id_2,valid_aphia_id,
+                    scientificname, valid_name) %>% 
       dplyr::rename(speci = reported_taxon,
                     rlist = rlist),
     by = "speci"
@@ -130,11 +132,17 @@ tx <- dfout$taxa_name %>%
     RLIST = rlist
   )
 
-dfout$SPECI <- tx$SPECI
-dfout$RLIST <- tx$RLIST
-rm(tx,records, record_info_missing,record_info_missing0, 
-   record_info_non_na, record_info_non_na0,
-   aphia_ids_non_na,aphia_ids, blankAPHIA)
+dfout$reported_Name <- tx$SPECI
+dfout$name_Type <- tx$RLIST
+dfout$Aphia_ID <- tx$aphia_id
+dfout$Aphia_ID_2 <- tx$aphia_id_2
+dfout$SPECI <- tx$valid_aphia_id
+dfout$Name_scientific <- tx$scientificname
+dfout$Name_valid <- tx$valid_name
+dfout$RLIST_old <- tx$RLIST
+# rm(tx,records, record_info_missing,record_info_missing0, 
+#    record_info_non_na, record_info_non_na0,
+#    aphia_ids_non_na,aphia_ids, blankAPHIA)
 tictoc::toc(log=TRUE)
 
 tictoc::tic("Sort & join NGR data")
@@ -172,6 +180,7 @@ dfout %>%
     MUNIT = "nrcells/l",
     ALABO = 32,
     SLABO = 32,
+    RLIST = "ERID",
     SMTYP = case_when(
       sample_method == "MARINE: Block Net" ~"BPL", ##Block Net method data entered in error
       sample_method == "MARINE: Bottle Sample" ~"BPL",
@@ -264,8 +273,11 @@ dfout %>%
     CLMET,
     FLVOL,
     NPORT,
-    SPECI,
     RLIST,
+    SPECI,
+    Name_valid,
+    reported_Name,
+    RLIST_old,
     SFLAG,
     STRID,
     SIZCL,
@@ -310,13 +322,55 @@ dfout %>%
     MSTAT,
     PURPM,
     MPROG
-    ) -> dfout
+    ) -> dfout_exp
 tictoc::toc(log = TRUE)
 
 tictoc::tic("Write data")
-write.csv(x = dfout,
-          file = "outputs/OSPAR_Phyto_export.csv",
+write.csv(x = dfout_exp,
+          file = "outputs/OSPAR_Phyto_export_MASTER.csv",
           row.names = FALSE)
+saveRDS(dfout_exp,file = "outputs/OSPAR_Phyto_export_MASTER.Rdat")
 tictoc::toc(log = TRUE)
 
+tictoc::tic("Create Aphia_Clean")
+# Create Aphia_Clean version: retain only those taxa recorded as RLIST_old == "ERID"
+dfout_exp %>% 
+  dplyr::filter(., RLIST_old == "ERID") %>% 
+  # remove unneeded columns
+  dplyr::select(
+    -c(
+      Name_valid,
+      reported_Name,
+      RLIST_old
+      )
+    ) -> dfout_AphiaClean
+tictoc::tic("Write data")
+write.csv(x = dfout_AphiaClean,
+          file = "outputs/OSPAR_Phyto_export_Aphia.csv",
+          row.names = FALSE)
+saveRDS(dfout_AphiaClean,file = "outputs/OSPAR_Phyto_export_Aphia.Rdat")
+tictoc::toc(log = TRUE)
+tictoc::toc(log = TRUE)
+
+tictoc::tic("Create NT version")
+# Create Aphia_Clean version: retain only those taxa recorded as RLIST_old == "NT"
+dfout_exp %>% 
+  dplyr::filter(., RLIST_old == "NT") %>% 
+  # remove unneeded columns
+  dplyr::select(
+    -c(
+      Name_valid,
+      reported_Name,
+      RLIST_old
+    )
+  ) -> dfout_NT
+tictoc::tic("Write data")
+write.csv(x = dfout_NT,
+          file = "outputs/OSPAR_Phyto_export_NT.csv",
+          row.names = FALSE)
+saveRDS(dfout_NT,file = "outputs/OSPAR_Phyto_export_NT.Rdat")
+tictoc::toc(log = TRUE)
+
+tictoc::toc(log = TRUE)
+tictoc::toc(log=TRUE)
 unlist(tictoc::tic.log())
