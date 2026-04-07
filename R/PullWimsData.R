@@ -119,7 +119,7 @@ tic("Create WBID_date variable for plankton data")
 dfsummary %>% 
   dplyr::mutate(code = paste0(wbid, "_", sample_date)) %>% 
   dplyr::mutate(code = str_remove_all(code, "-")) -> dfsummary_wb
-
+toc(log=TRUE)
 # Trim WIMS data by those '.$code' values in plankton data ####
 tic("Trim WIMS data by those '.$code' values in plankton data")
 logics <- wimsdat_wb$code %in% dfsummary_wb$code
@@ -135,6 +135,9 @@ wimsdat_wb_trm %>%
   dplyr::mutate(dete_units = paste0(DETE_SHORT_DESC,"_",UNIT_SHORT_DESC)) %>% 
   #remove now-obsolete info
   dplyr::select(-c(
+    MEAS_ANAL_METH_CODE,
+    MEAS_DETERMINAND_CODE,
+    MEAS_LIMITS,
     DETE_SHORT_DESC,
     UNIT_SHORT_DESC
   )) %>% 
@@ -146,11 +149,36 @@ wimsdat_wb_trm %>%
       as.character(MEAS_RESULT)
       )) %>% 
   dplyr::select(-c(MEAS_SIGN, MEAS_RESULT)) %>% 
+  
+  ## remove ODD samples which flag as duplicates
+  dplyr::filter(SAMP_ID != "1568725" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "1563520" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "1564003" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "1568839" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "5196058" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "5198151" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "3295414" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "3295127" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "1563813" & dete_units != "123789-HxCDD_pg/l") %>% 
+  dplyr::filter(SAMP_ID != "1568958" & dete_units != "123789-HxCDD_pg/l") %>%
+  dplyr::filter(SAMP_ID != "938194" & dete_units != "1,3 -DICHLOR_ug/l") %>% 
+  dplyr::filter(SAMP_ID != "926030" & dete_units != "OrthophsFilt_mg/l") %>%
+  dplyr::filter(SAMP_ID != "926033" & dete_units != "OrthophsFilt_mg/l") %>%
+  dplyr::filter(SAMP_ID != "926038" & dete_units != "OrthophsFilt_mg/l") %>%
+  dplyr::filter(SAMP_ID != "979790" & dete_units != "OrthophsFilt_mg/l") %>%
+  dplyr::filter(SAMP_ID != "979785" & dete_units != "OrthophsFilt_mg/l") %>%
+  
   # Pivot to wider
   pivot_wider(
     names_from = dete_units,
     values_from = result_use
     ) -> wimsdat_wb_trm_w
+
+toc(log=TRUE)
+
+tic("Bind WIMS to phyto")
+dfsummary_wb %>% 
+  dplyr::left_join(., wimsdat_wb_trm_w, by = "code")
 
 
 unlist(tictoc::tic.log())
