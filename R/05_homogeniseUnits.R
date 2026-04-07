@@ -208,9 +208,10 @@ dfall_use %>%
        caption = "Lines indicate generalised additive model predictions with Duchon splines",
        # x="Day of year",
        #x="Date",
-       y=bquote(bold(log[10][(n+1)]~Carbon~content)))+
+       y=bquote(bold(log[10][(n+1)]~Carbon~content~"(as ug C/m3)")))+
   theme(
     plot.title = element_text(face=2),
+    plot.caption = element_text(face=2),
     axis.title.x = element_blank(),
     axis.title.y = element_text(face=2),
     axis.text.x = element_text(face=2,size=12),
