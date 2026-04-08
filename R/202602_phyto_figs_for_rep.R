@@ -223,6 +223,77 @@ df %>% #names()
   )
 dev.off()
 
+# tweak carbon graphs to check ####
+df %>% #names()
+  ## total carbon: cells per litre
+  select(sample_id,date_plot,md_carbon_tot_ug_c_per_m3,rbd) %>% 
+  ##remove zero values
+  dplyr::filter(!is.na(md_carbon_tot_ug_c_per_m3)) %>% 
+  group_by(across(-md_carbon_tot_ug_c_per_m3)) %>% 
+  # get sum per sample
+  summarise(md_carbon_tot_ug_c_per_m3 = sum(md_carbon_tot_ug_c_per_m3,
+                                            na.rm = TRUE),
+            .groups = "drop") %>% ungroup() %>% 
+  dplyr::filter(md_carbon_tot_ug_c_per_m3 !=0) %>% 
+  ggplot(.,
+         aes(
+           x = date_plot,
+           # y = cells_per_litre
+           # y = md_carbon_tot_ug_c_per_m3,
+           y = log10(md_carbon_tot_ug_c_per_m3+1)
+         )
+  )+
+  geom_rug(sides = "b")+
+  geom_vline(xintercept = as.Date(c("2000-01-01","2005-01-01",
+                                    "2010-01-01","2015-01-01",
+                                    "2020-01-01","2025-01-01"
+  )
+  ),
+  lty = 2, col="grey")+
+  geom_vline(xintercept = as.Date(c("2001-01-01","2002-01-01","2003-01-01","2004-01-01",
+                                    "2006-01-01","2007-01-01","2008-01-01","2009-01-01",
+                                    "2011-01-01","2012-01-01","2013-01-01","2014-01-01",
+                                    "2016-01-01","2017-01-01","2018-01-01","2019-01-01",
+                                    "2021-01-01","2022-01-01","2023-01-01","2024-01-01"
+  )
+  ),
+  lty = 3, col="grey")+
+  geom_point()+
+  # geom_point(aes(fill = n),size=4,pch=21)+
+  # geom_hline(yintercept = 4,col=2,lwd=1.5)+
+  geom_smooth(method = "gam")+
+  facet_wrap(.~rbd)+
+  ylim(0,NA)+
+  labs(
+    # title = "Log10 median phytoplanton carbon content by year_month",
+    title = "Median phytoplanton carbon content by year_month",
+    # y = "Log10(n+1) median carbon content (ug/m3) per sample",
+    y = "Median carbon content (ug/m3) per sample",
+    caption=paste0("Values represent median total carbon contents across all samples gathered in a particular month","<br>",
+                   "Point shading reflects number of samples contributing to that mean",
+                   "<br>","Blue line represents generalised additive model trend"
+    ),
+    fill = "Num.<br>samples"
+  )+
+  # scale_colour_binned() +
+  scale_fill_stepsn(
+    # colours = c("red", "yellow", "green", "yellow", "red"),
+    # breaks = c(0, 0.2, 0.4, 0.6, 0.8, 1)
+    colours = c("#FEE0D2", "#FC9272", "#DE2D26"),
+    # breaks = c(100, 200, 300)
+  )+
+  theme(
+    palette.color.continuous = c("#FEE0D2", "#FC9272", "#DE2D26"),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2,size=12),
+    axis.text = element_text(face=2),
+    strip.text = element_text(face=2,size=12),
+    axis.text.x = element_text(size = 12),
+    plot.caption = ggtext::element_markdown(face=2,size=12),
+    plot.title = element_text(face=2,size = 14),
+    legend.title = ggtext::element_markdown(face=2),
+  )
+
 # create summary table ####
 # df is the by-taxon data for phytoplankton, containing variables for 
 # sample metadata, lifeform & taxon info, as well as the stuff we're more interested in:
