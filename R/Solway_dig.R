@@ -289,8 +289,15 @@ year_lines5<- tibble(
 
 # DINOFLAG PLOT ####
 nwdino %>% 
+  filter(wb_name != "TWEED") %>% 
+  ## create new facetting variable to extract Allonby data
+  mutate(label = if_else(
+    str_starts(site_station_name,"ALLONBY"),
+    "ALLONBY BAY",
+    wb_name
+  )) %>% 
   dplyr::select(.,
-                sample_date, cells_per_litre_millilitre, wb_name,sample_id) %>% 
+                sample_date, cells_per_litre_millilitre, wb_name,sample_id,label) %>% 
   group_by(across(!cells_per_litre_millilitre)) %>% 
   summarise(cells_per_litre_millilitre = sum(cells_per_litre_millilitre,na.rm = TRUE),
             .groups = "drop") %>% 
@@ -307,13 +314,14 @@ nwdino %>%
              aes(xintercept = as.numeric(year_start)),
              color = "grey50", linewidth = 0.3,lty=2)+
   geom_point()+
-  facet_wrap(.~wb_name)+
+  facet_wrap(.~label)+
   ggthemes::theme_few()+
-  geom_smooth(method="gam")+
+  geom_smooth(method="loess",span=0.8)+
   labs(
     title = "Dinoflagellate abundances recorded in selected English water bodies",
     subtitle = "Data faceted by Environment Agency water body",
-    caption = "EA data filtered to retain taxa belonging to Infraphylum Dinoflagellata",
+    caption = "EA data filtered to retain taxa belonging to Infraphylum Dinoflagellata
+    Lines represent loess smooth",
     y="Log10 cells per litre (n+1)"
     )+
   theme(
@@ -340,8 +348,15 @@ diat %>%
   dplyr::filter(river_basi=="North West"|river_basi=="Solway Tweed") -> nwdiat
 
 nwdiat %>% 
-dplyr::select(.,
-              sample_date, cells_per_litre_millilitre, wb_name,sample_id) %>% 
+  filter(wb_name != "TWEED") %>% 
+  ## create new facetting variable to extract Allonby data
+  mutate(label = if_else(
+    str_starts(site_station_name,"ALLONBY"),
+    "ALLONBY BAY",
+    wb_name
+  )) %>% 
+  dplyr::select(.,
+                label,sample_date, cells_per_litre_millilitre, wb_name,sample_id) %>% 
   group_by(across(!cells_per_litre_millilitre)) %>% 
   summarise(cells_per_litre_millilitre = sum(cells_per_litre_millilitre,na.rm = TRUE),
             .groups = "drop") %>% 
@@ -358,13 +373,14 @@ dplyr::select(.,
              aes(xintercept = as.numeric(year_start)),
              color = "grey50", linewidth = 0.3,lty=2)+
   geom_point()+
-  facet_wrap(.~wb_name)+
+  facet_wrap(.~label)+
   ggthemes::theme_few()+
-  geom_smooth(method="gam")+
+  geom_smooth(method="loess")+
   labs(
     title = "Diatom abundances recorded in selected English water bodies",
     subtitle = "Data faceted by Environment Agency water body",
-    caption = "EA data filtered to retain taxa belonging to Subphylum Bacillariophytina",
+    caption = "EA data filtered to retain taxa belonging to Subphylum Bacillariophytina
+    Lines represent loess smooth",
     y="Log10 cells per litre (n+1)"
   )+
   theme(
@@ -379,5 +395,61 @@ dplyr::select(.,
 
 ggsave(plot = get_last_plot(),
        filename = paste0("outputs/figs/SolwayNW_Diatoms.png"),
+       width = 18, height = 8, units = "in"
+       )
+
+# TOTAL PHYTO PLOT ####
+# diat <-  %>%
+#   # dplyr::filter(!is.na(valid_infraphylum)) %>% 
+#   dplyr::filter(subphylum=="Bacillariophytina")
+
+dfout %>%
+  dplyr::filter(river_basi=="North West"|river_basi=="Solway Tweed") %>% 
+  filter(wb_name != "TWEED") %>% 
+  ## create new facetting variable to extract Allonby data
+  mutate(label = if_else(
+    str_starts(site_station_name,"ALLONBY"),
+    "ALLONBY BAY",
+    wb_name
+  )) %>% 
+  dplyr::select(.,
+                label,sample_date, cells_per_litre_millilitre, wb_name,sample_id) %>% 
+  group_by(across(!cells_per_litre_millilitre)) %>% 
+  summarise(cells_per_litre_millilitre = sum(cells_per_litre_millilitre,na.rm = TRUE),
+            .groups = "drop") %>% 
+  ungroup() %>%
+  ggplot(.,
+         aes(
+           x = sample_date,
+           y = log10(cells_per_litre_millilitre+1),
+         ))+
+  geom_vline(data = year_lines,
+             aes(xintercept = as.numeric(year_start)),
+             color = "grey70", linewidth = 0.3,lty=3)+
+  geom_vline(data = year_lines5,
+             aes(xintercept = as.numeric(year_start)),
+             color = "grey50", linewidth = 0.3,lty=2)+
+  geom_point()+
+  facet_wrap(.~label)+
+  ggthemes::theme_few()+
+  geom_smooth(method="loess")+
+  labs(
+    title = "Total phytoplankton abundances recorded in selected English water bodies",
+    subtitle = "Data faceted by Environment Agency water body",
+    caption = "Lines represent loess smooth",
+    y="Log10 cells per litre (n+1)"
+  )+
+  theme(
+    strip.text = element_text(face=2,size = 14),
+    axis.text = element_text(face=2,size = 12),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2,size = 14),
+    plot.title = element_text(face=2,size = 16),
+    plot.subtitle = element_text(face=2,size = 14),
+    plot.caption = element_text(face=2,size = 14),
+  )
+
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/SolwayNW_ALL.png"),
        width = 18, height = 8, units = "in"
        )
