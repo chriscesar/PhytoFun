@@ -15,7 +15,7 @@ tic("DATA IMPORT: Downloading, importing & loading data");print("Downloading, im
 source("R/dataFolders.R")
 
 df_phyto0 <- readxl::read_xlsx("data/Phyto_2000_2025.xlsx",sheet = "PhyoData",
-                               guess_max = 2000)
+                               guess_max = 25000)
 saveRDS(janitor::clean_names(df_phyto0), file = "outputs/Phyto_2000_2025.Rdat")
 toc(log=TRUE)
 
