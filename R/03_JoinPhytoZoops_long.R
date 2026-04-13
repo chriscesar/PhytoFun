@@ -386,6 +386,14 @@ dfall_join %>%
     strip.text = element_text(face=2)
   )
 
+tic("Assign RBD factors")
+dfall_join$rbd <- factor(dfall_join$rbd,levels = c(
+  "Solway Tweed","Northumbria","Humber","Anglian",
+  "Thames", "South East","South West","Severn",
+  "North West"
+))
+toc(log=TRUE)
+
 tic("Export data")
 # Export data ####
 saveRDS(dfall_join, file = "outputs/ZoopPhytoMatchingBIOSYS_long.Rdat")
