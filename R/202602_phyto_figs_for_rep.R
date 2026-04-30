@@ -46,6 +46,28 @@ rm(fac_tmp)
 
 tictoc::toc()
 
+# FOR COMPARISON WITH OTHER METHOD ####
+df %>%
+  ## total abundance: cells per litre
+  select(sample_id,rbd,wb_name,sample_date,
+         date_plot,md_carbon_tot_ug_c_per_m3) %>% #View()
+  group_by(across(-md_carbon_tot_ug_c_per_m3)) %>% 
+  # get sum per sample
+  summarise(md_carbon_tot_ug_c_per_m3 = sum(md_carbon_tot_ug_c_per_m3,
+                                            na.rm = TRUE),
+            .groups = "drop") %>% 
+  # get mean sum by date
+  ## drop sample ID
+  select(-sample_id) %>% group_by(date_plot) %>% 
+  summarise(mn_md_carbon_tot_ug_c_per_m3 = mean(md_carbon_tot_ug_c_per_m3,na.rm = TRUE),
+            sd_md_carbon_tot_ug_c_per_m3 = sd(md_carbon_tot_ug_c_per_m3,na.rm=TRUE),
+            n = n(),
+            .groups = "drop"
+            ) %>%
+  write.csv(.,
+            file="data/TEST_phyto_from_202602_phyto_figs_for_rep.R.csv",
+            row.names = FALSE)
+
 # summarise counts by sampling event & plot ####
 # png(file = paste0(outfol,"phyto_abund_log10.png"),
 png(file = paste0(outfol,
