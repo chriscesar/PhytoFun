@@ -264,18 +264,32 @@ tic("calculate values in consistent units")
 # calculate values in consistent units ####
 dfall %>% 
   ## create variable for micrograms of Carbon per INDIVIDUAL
-  mutate(
-    mn_carb_ind_as_ugC = if_else(mn_carb_ind_units == "ugC_per_inividual",
-                                 as.numeric(mn_carb_ind),
-                                 as.numeric(mn_carb_ind)/1000),
-    md_carb_ind_as_ugC = if_else(md_carb_ind_units == "ugC_per_inividual",
-                                 as.numeric(md_carb_ind),
-                                 as.numeric(md_carb_ind)/1000)
-    ) %>%
+  mutate(mn_carb_ind_as_ugC = case_when(
+    mn_carb_ind_units == "ugC_per_inividual" ~ mn_carb_ind,
+    mn_carb_ind_units == "pg_C_per_cell" ~ mn_carb_ind/1e6,
+    TRUE ~ NA_real_
+    ),
+    md_carb_ind_as_ugC = case_when(
+      md_carb_ind_units == "ugC_per_inividual" ~ md_carb_ind,
+      md_carb_ind_units == "pg_C_per_cell" ~ md_carb_ind/1e6,
+      TRUE ~ NA_real_
+    )
+  ) %>% 
+  # WRONG CONVERSION:
+  # mn_carb_ind_as_ugC = if_else(mn_carb_ind_units == "ugC_per_inividual",
+  #                              as.numeric(mn_carb_ind),
+  #                              as.numeric(mn_carb_ind)/1000),
+  # md_carb_ind_as_ugC = if_else(md_carb_ind_units == "ugC_per_inividual",
+  #                              as.numeric(md_carb_ind),
+  #                              as.numeric(md_carb_ind)/1000)
   ## create variable to show abundances per m3
-  mutate(abundance_m3 = if_else(abundance_units == "Count_per_m3",
-                                abundance,
-                                abundance*1000)) %>% 
+  # use case_when to clarify
+  mutate(abundance_m3 = case_when(
+    abundance_units == "Count_per_m3" ~ abundance,
+    abundance_units == "cells_per_litre" ~ abundance*1000,
+    TRUE ~ NA_real_
+    )
+    ) %>%
   ## multiply carbon per individual by abundance/m3
   ##to show carbon per m3
   mutate(mn_carb_ugC_per_m3 = abundance_m3*mn_carb_ind_as_ugC,
