@@ -307,7 +307,7 @@ unlist(tictoc::tic.log())
 # Tidy up ####
 rm(list = ls(pattern = "^df"))
 rm(list = ls(pattern = "^cb"))
-rm(phytotrm, zooptrm, theme_use,ppi, zoopfol, zoop_meta)
+rm(phytotrm, zooptrm, theme_use,ppi, zoopfol, zoop_meta,GISfol)
 
 detach("package:tidyverse", unload=TRUE)
 detach("package:tidyr", unload=TRUE)
