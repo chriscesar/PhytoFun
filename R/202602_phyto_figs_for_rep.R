@@ -43,30 +43,29 @@ rm(fac_tmp)
 #   # tidyr::complete(yyyy_mm, DJF, fill = list(mn_carbTot_m3 = 0))
 #   tidyr::complete(yyyy_mm_fac, DJF, fill = list(mn_carbTot_m3 = 0))
 
-
 tictoc::toc()
 
-# FOR COMPARISON WITH OTHER METHOD ####
-df %>%
-  ## total abundance: cells per litre
-  select(sample_id,rbd,wb_name,sample_date,
-         date_plot,md_carbon_tot_ug_c_per_m3) %>% #View()
-  group_by(across(-md_carbon_tot_ug_c_per_m3)) %>% 
-  # get sum per sample
-  summarise(md_carbon_tot_ug_c_per_m3 = sum(md_carbon_tot_ug_c_per_m3,
-                                            na.rm = TRUE),
-            .groups = "drop") %>% 
-  # get mean sum by date
-  ## drop sample ID
-  select(-sample_id) %>% group_by(date_plot) %>% 
-  summarise(mn_md_carbon_tot_ug_c_per_m3 = mean(md_carbon_tot_ug_c_per_m3,na.rm = TRUE),
-            sd_md_carbon_tot_ug_c_per_m3 = sd(md_carbon_tot_ug_c_per_m3,na.rm=TRUE),
-            n = n(),
-            .groups = "drop"
-            ) %>%
-  write.csv(.,
-            file="data/TEST_phyto_from_202602_phyto_figs_for_rep.R.csv",
-            row.names = FALSE)
+# # FOR COMPARISON WITH OTHER METHOD ####
+# df %>%
+#   ## total abundance: cells per litre
+#   select(sample_id,rbd,wb_name,sample_date,
+#          date_plot,md_carbon_tot_ug_c_per_m3) %>% #View()
+#   group_by(across(-md_carbon_tot_ug_c_per_m3)) %>% 
+#   # get sum per sample
+#   summarise(md_carbon_tot_ug_c_per_m3 = sum(md_carbon_tot_ug_c_per_m3,
+#                                             na.rm = TRUE),
+#             .groups = "drop") %>% 
+#   # get mean sum by date
+#   ## drop sample ID
+#   select(-sample_id) %>% group_by(date_plot) %>% 
+#   summarise(mn_md_carbon_tot_ug_c_per_m3 = mean(md_carbon_tot_ug_c_per_m3,na.rm = TRUE),
+#             sd_md_carbon_tot_ug_c_per_m3 = sd(md_carbon_tot_ug_c_per_m3,na.rm=TRUE),
+#             n = n(),
+#             .groups = "drop"
+#             ) %>%
+#   write.csv(.,
+#             file="data/TEST_phyto_from_202602_phyto_figs_for_rep.R.csv",
+#             row.names = FALSE)
 
 # summarise counts by sampling event & plot ####
 # png(file = paste0(outfol,"phyto_abund_log10.png"),
@@ -216,7 +215,7 @@ df %>% #names()
   ylim(0,NA)+
   labs(
     # title = "Log10 median phytoplanton carbon content by year_month",
-    title = "Median phytoplanton carbon content by year_month",
+    title = "Median phytoplankton carbon content by year_month",
     # y = "Log10(n+1) median carbon content (ug/m3) per sample",
     y = "Median carbon content (ug/m3) per sample",
     caption=paste0("Values represent median total carbon contents across all samples gathered in a particular month","<br>",
@@ -288,7 +287,7 @@ df %>% #names()
   ylim(0,NA)+
   labs(
     # title = "Log10 median phytoplanton carbon content by year_month",
-    title = "Median phytoplanton carbon content by year_month",
+    title = "Median phytoplankton carbon content by year_month",
     # y = "Log10(n+1) median carbon content (ug/m3) per sample",
     y = "Median carbon content (ug/m3) per sample",
     caption=paste0("Values represent median total carbon contents across all samples gathered in a particular month","<br>",
@@ -413,8 +412,8 @@ dfwims %>% #names()
   # filter(date_plot >"2006-12-31") %>% 
   ggplot(., aes(
     x = date_plot,
-    # y = chla,
-    y = log10(chla),
+    y = chla,
+    # y = log10(chla),
     )
     )+
   geom_rug(sides = "b")+
@@ -435,10 +434,10 @@ dfwims %>% #names()
   geom_point(aes(fill = n),size=4,pch=21)+
   geom_smooth(method = "gam")+
   labs(
-    # title = "Chlorophyll content by year_month",
-    title = "Log10 chlorophyll content by year_month",
-    # y = "Mean chlorophyll content (ug/l) per sample",
-    y = "Log10 mean chlorophyll content (ug/l) per sample",
+    title = "Chlorophyll content by year_month",
+    # title = "Log10 chlorophyll content by year_month",
+    y = "Mean chlorophyll content (ug/l) per sample",
+    # y = "Log10 mean chlorophyll content (ug/l) per sample",
     caption=paste0("Values represent mean chlorophyll contents across all samples gathered in a particular month",
                    "<br>",
                    "Point shading reflects number of samples contributing to that mean",
