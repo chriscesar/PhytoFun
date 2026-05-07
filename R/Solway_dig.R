@@ -269,7 +269,7 @@ dino <- dfout %>%
 
 dino %>% dplyr::filter(river_basi=="North West"|river_basi=="Solway Tweed") -> nwdino
 
-
+## set line objects ####
 # Create a sequence of January 1st for each year spanned by your data
 year_lines <- tibble(
   year_start = seq(
@@ -286,6 +286,21 @@ year_lines5<- tibble(
     by = "5 years"
   )
 )
+
+# recent version
+year_lines_new <- tibble(year_start = as.Date(c("2023-01-01",
+                                                "2024-01-01",
+                                                "2025-01-01")
+                                              )) %>% 
+  filter(year_start > "2022-12-31")
+
+# year_lines5_new<- tibble(
+#   year_start = seq(
+#     floor_date(min(nwdino$sample_date, na.rm = TRUE), unit = "year"),
+#     floor_date(max(nwdino$sample_date, na.rm = TRUE), unit = "year"),
+#     by = "5 years"
+#   )
+# )
 
 # DINOFLAG PLOT ####
 nwdino %>% 
@@ -336,6 +351,71 @@ nwdino %>%
 
 ggsave(plot = get_last_plot(),
        filename = paste0("outputs/figs/SolwayNW_Dinoflag.png"),
+       width = 18, height = 8, units = "in"
+       )
+
+# DINOFLAG PLOT update ####
+# following request from NE:
+## Just cover 2023-2025
+## Limit to Solway, Mersey, Mersey Mouth, Lune, Ribble and Wyre
+
+nwdino %>% 
+  filter(wb_name != "TWEED") %>% 
+  ## create new facetting variable to extract Allonby data
+  mutate(label = if_else(
+    str_starts(site_station_name,"ALLONBY"),
+    "ALLONBY BAY",
+    wb_name
+  )) %>% 
+  dplyr::select(.,
+                sample_date, cells_per_litre_millilitre, wb_name,
+                sample_id,label,site_station_name) %>% 
+  group_by(across(!cells_per_litre_millilitre)) %>% 
+  summarise(cells_per_litre_millilitre = sum(cells_per_litre_millilitre,na.rm = TRUE),
+            .groups = "drop") %>% 
+  ungroup() %>% 
+  filter(wb_name %in% c("SOLWAY", "MERSEY", "Mersey Mouth",
+                        "LUNE", "RIBBLE","WYRE","Solway Outer South")
+         ) %>% 
+  # filter(sample_date > "2022-12-31") %>%
+  filter(sample_date > "2023-12-31") %>% 
+  filter(sample_date < "2025-01-01") %>% 
+  
+  ggplot(.,
+         aes(
+           x = sample_date,
+           y = log10(cells_per_litre_millilitre+1),
+         ))+
+  # geom_vline(xintercept = as.Date(c("2023-01-01",
+  #                                   "2024-01-01",
+  #                                   "2025-01-01"
+  #                                   )),
+  #            color = "grey70",
+  #            linewidth = 0.3,
+  #            lty=3)+
+  geom_point()+
+  facet_wrap(.~label)+
+  ggthemes::theme_few()+
+  geom_smooth(method="loess",span=0.8)+
+  labs(
+    title = "Dinoflagellate abundances recorded in selected English water bodies",
+    subtitle = "Data faceted by Environment Agency water body",
+    caption = "EA data filtered to retain taxa belonging to Infraphylum Dinoflagellata
+    Lines represent loess smooth",
+    y="Log10 cells per litre (n+1)"
+  )+
+  theme(
+    strip.text = element_text(face=2,size = 14),
+    axis.text = element_text(face=2,size = 12),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2,size = 14),
+    plot.title = element_text(face=2,size = 16),
+    plot.subtitle = element_text(face=2,size = 14),
+    plot.caption = element_text(face=2,size = 14),
+  )
+
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/SolwayNW_Dinoflag_update_2024.png"),
        width = 18, height = 8, units = "in"
        )
 
@@ -397,6 +477,77 @@ ggsave(plot = get_last_plot(),
        filename = paste0("outputs/figs/SolwayNW_Diatoms.png"),
        width = 18, height = 8, units = "in"
        )
+
+# DIATOM PLOT update ####
+diat <- dfout %>%
+  # dplyr::filter(!is.na(valid_infraphylum)) %>% 
+  dplyr::filter(subphylum=="Bacillariophytina")
+
+diat %>%
+  dplyr::filter(river_basi=="North West"|river_basi=="Solway Tweed") -> nwdiat
+
+nwdiat %>% 
+  filter(wb_name != "TWEED") %>% 
+  ## create new facetting variable to extract Allonby data
+  mutate(label = if_else(
+    str_starts(site_station_name,"ALLONBY"),
+    "ALLONBY BAY",
+    wb_name
+  )) %>% 
+  dplyr::select(.,
+                label,sample_date, cells_per_litre_millilitre, wb_name,sample_id) %>% 
+  group_by(across(!cells_per_litre_millilitre)) %>% 
+  summarise(cells_per_litre_millilitre = sum(cells_per_litre_millilitre,na.rm = TRUE),
+            .groups = "drop") %>% 
+  ungroup() %>% 
+  filter(wb_name %in% c("SOLWAY", "MERSEY", "Mersey Mouth",
+                        "LUNE", "RIBBLE","WYRE","Solway Outer South")
+  ) %>% 
+  # filter(sample_date > "2022-12-31") %>% 
+  filter(sample_date > "2023-12-31") %>% 
+  filter(sample_date < "2025-01-01") %>% 
+  ggplot(.,
+         aes(
+           x = sample_date,
+           y = log10(cells_per_litre_millilitre+1),
+         ))+
+  # geom_vline(xintercept = as.Date(c("2023-01-01",
+  #                                   "2024-01-01",
+  #                                   "2025-01-01"
+  #                                   )),
+  # color = "grey70",
+  # linewidth = 0.3,
+  # lty=3)+
+  # geom_vline(data = year_lines,
+  #            aes(xintercept = as.numeric(year_start)),
+  #            color = "grey70", linewidth = 0.3,lty=3)+
+  # geom_vline(data = year_lines5,
+  #            aes(xintercept = as.numeric(year_start)),
+  #            color = "grey50", linewidth = 0.3,lty=2)+
+  geom_point()+
+  facet_wrap(.~label)+
+  ggthemes::theme_few()+
+  geom_smooth(method="loess")+
+  labs(
+    title = "Diatom abundances recorded in selected English water bodies",
+    subtitle = "Data faceted by Environment Agency water body",
+    caption = "EA data filtered to retain taxa belonging to Subphylum Bacillariophytina
+    Lines represent loess smooth",
+    y="Log10 cells per litre (n+1)"
+  )+
+  theme(
+    strip.text = element_text(face=2,size = 14),
+    axis.text = element_text(face=2,size = 12),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2,size = 14),
+    plot.title = element_text(face=2,size = 16),
+    plot.subtitle = element_text(face=2,size = 14),
+    plot.caption = element_text(face=2,size = 14),
+  )
+
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/SolwayNW_Diatoms_update_2024.png"),
+       width = 18, height = 8, units = "in")
 
 # TOTAL PHYTO PLOT ####
 # diat <-  %>%
