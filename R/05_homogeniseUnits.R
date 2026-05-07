@@ -1,7 +1,8 @@
 # 05_homogeniseUnits.R ####
 
 # load packages ####
-ld_pkgs <- c("tidyverse","tictoc","stringr", "forcats", "patchwork")
+ld_pkgs <- c("tidyverse","tictoc","stringr", "forcats", "patchwork",
+             "seas")
 vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
@@ -865,9 +866,11 @@ dfall_use %>%
            # TRUE ~ NA_real_
            )
          ) %>% 
+  dplyr::mutate(seas = seas::mkseas(sample_date,width="DJF")) %>% 
   ggplot(., aes(
     # x = yday,
-    x = sample_date,
+    x = seas,
+    # x = sample_date,
     y = c_ug_diff_log10,
     # colour = abv_zero,
     shape = abv_zero,
@@ -889,9 +892,11 @@ dfall_use %>%
     inherit.aes = FALSE
   )+
   geom_hline(yintercept = 0, lty = 2)+
-  geom_point(show.legend = FALSE,
-             size = 2
-             )+
+  geom_hline(yintercept = c(1,-1),lty=3)+
+  geom_jitter(show.legend = FALSE, size = 2, width = 0.1)+
+  # geom_point(show.legend = FALSE,
+  #            size = 2
+  #            )+
   scale_shape_manual(values = c(21,24))+
   scale_fill_manual(values=c("green","blue"))+
   ggh4x::facet_wrap2(
@@ -918,4 +923,292 @@ dfall_use %>%
 ggsave(plot = get_last_plot(),
        filename = paste0("outputs/figs/ts_phytZoop_diff_log10.tiff"),
        width = 18, height = 8, units = "in"
-)
+       )
+
+## Annual total differences ####
+## create dummy df for rectangles
+rect_data <- data.frame(dummy = 1)
+dfall_use %>% 
+  # put Regions in 'clockwise' order
+  dplyr::mutate(rgn_wb = paste0(region,": ",wb)) %>% 
+  dplyr::select(-c(
+    lifeform,
+    abundance, abundance_units,
+    #abundance_m3,
+    mn_carb_tot, mn_carb_tot_units,
+    md_carb_tot, md_carb_tot_units,
+    mn_carb_ind,mn_carb_ind_units,md_carb_ind,
+    md_carb_ind_units,mn_carb_ind_as_ugC,md_carb_ind_as_ugC,
+    mn_size,mn_size_units,md_size,md_size_units,
+    aphia_id,taxon
+  )) %>% #names()
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  group_by(across(c(-abundance_m3,
+                    -mn_carb_ugC_per_m3,
+                    -md_carb_ugC_per_m3
+  ))) %>% 
+  summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
+            mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3,na.rm = TRUE),
+            md_carb_ugC_per_m3 = sum(md_carb_ugC_per_m3, na.rm = TRUE),
+            .groups = "drop") %>% #View()
+  dplyr::mutate(yday = lubridate::yday(sample_date)) %>% 
+  ## reorder sites by region
+  dplyr::mutate(biosys_short = factor(
+    biosys_short,
+    levels = unique(biosys_short[order(region)])
+  )
+  ) %>% 
+  ## create label variable
+  dplyr::mutate(regn_wb_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb))) %>%
+  dplyr::mutate(regn_wb_biosys_lbl = paste0(vegan::make.cepnames(region),
+                                            "_",
+                                            vegan::make.cepnames(wb),
+                                            "_",
+                                            biosys_short)) %>%
+  dplyr::mutate(wb_biosys_lbl = paste0(
+    vegan::make.cepnames(wb),
+    "_",
+    biosys_short)) %>%
+  dplyr::mutate(regn_wb_lbl = factor(
+    regn_wb_lbl,
+    levels = unique(regn_wb_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::mutate(regn_wb_biosys_lbl = factor(
+    regn_wb_biosys_lbl,
+    levels = unique(regn_wb_biosys_lbl[order(region)])
+  )
+  ) %>% 
+  # Create separate column for phyto and zoops based on median carbon
+  dplyr::select(region,
+                wb_biosys_lbl,
+                regn_wb_biosys_lbl,
+                yday,sample_date,
+                data_set,
+                md_carb_ugC_per_m3
+  ) %>% 
+  pivot_wider(names_from = data_set,
+              values_from = md_carb_ugC_per_m3) %>% 
+  filter(complete.cases(.)) %>% 
+  mutate(c_ug_diff = Phytoplankton - Zooplankton,
+         c_ug_diff_log10 = log10(Phytoplankton) - log10(Zooplankton)
+  ) %>% 
+  dplyr::mutate(seas = seas::mkseas(sample_date,width="DJF")) %>% 
+  dplyr::select(region,wb_biosys_lbl,sample_date,
+                Phytoplankton,Zooplankton
+                ) %>% 
+  mutate(yr = year(sample_date)) %>% 
+  dplyr::select(-sample_date) %>% 
+  group_by(across(-c(Phytoplankton,Zooplankton))) %>% 
+  summarise(Phytoplankton = sum(Phytoplankton),
+            Zooplankton = sum(Zooplankton),
+            .groups = "drop") %>% 
+  mutate(c_ug_diff_log10 = log10(Phytoplankton) - log10(Zooplankton)) %>% 
+  mutate(abv_zero = case_when(
+    c_ug_diff_log10 >0 ~ "Above",
+    c_ug_diff_log10 <0 ~ "Below",
+    # TRUE ~ NA_real_
+  )) %>% 
+  ggplot(., aes(
+    # x = yday,
+    x = yr,
+    # x = sample_date,
+    y = c_ug_diff_log10,
+    # colour = abv_zero,
+    shape = abv_zero,
+    fill = abv_zero,
+  )
+  )+
+  geom_rect(
+    data = rect_data,
+    aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0),
+    fill = "lightblue",
+    alpha = 0.4,
+    inherit.aes = FALSE
+  ) +
+  geom_rect(
+    data = rect_data,
+    aes(xmin = -Inf, xmax = Inf, ymin = 0, ymax = Inf),
+    fill = "lightgreen",
+    alpha = 0.4,
+    inherit.aes = FALSE
+  )+
+  geom_hline(yintercept = 0, lty = 2)+
+  geom_hline(yintercept = c(1,-1),lty=3)+
+  geom_jitter(show.legend = FALSE, size = 2, width = 0.1)+
+  # geom_point(show.legend = FALSE,
+  #            size = 2
+  #            )+
+  scale_shape_manual(values = c(21,24))+
+  scale_fill_manual(values=c("green","blue"))+
+  ggh4x::facet_wrap2(
+    vars(region,wb_biosys_lbl),
+    strip = ggh4x::strip_nested(bleed = TRUE)
+  )+
+  labs(title = bquote(bold("Estimated difference in "~log[10][(n+1)]~"total annual carbon content in phytoplankton vs zooplankton populations")),
+       subtitle = "<b><span style='color:darkgreen;'>Positive values</span></b> indicate majority of carbon stored within <b><span style='color:darkgreen;'>phytoplankton</span></b><br><b><span style='color:blue;'>Negative values</span></b> indicate majority of carbon stored within <b><span style='color:blue;'>zooplankton,</span>",
+       caption = "Only sampling occasions with data for both phytoplankton and zooplankton are presented",
+       y=bquote(bold(log[10][(n+1)]~Carbon~content~"(as ug C/m3)")))+
+  theme(
+    plot.title = element_text(face=2),
+    plot.caption = element_text(face=2,size = 12),
+    plot.subtitle = ggtext::element_markdown(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    axis.text.x = element_text(face=2,size=12),
+    axis.text.y = element_text(face=2,size=9),
+    legend.title = element_blank(),
+    legend.text = element_text(face=2,size=12),
+    strip.text = element_text(face=2),
+    strip.background = element_rect(color = 1),
+  )
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/ts_phytZoop_diff_log10_total_year.tiff"),
+       width = 18, height = 8, units = "in"
+       )
+
+## Annual median differences ####
+## create dummy df for rectangles
+rect_data <- data.frame(dummy = 1)
+dfall_use %>% 
+  # put Regions in 'clockwise' order
+  dplyr::mutate(rgn_wb = paste0(region,": ",wb)) %>% 
+  dplyr::select(-c(
+    lifeform,
+    abundance, abundance_units,
+    #abundance_m3,
+    mn_carb_tot, mn_carb_tot_units,
+    md_carb_tot, md_carb_tot_units,
+    mn_carb_ind,mn_carb_ind_units,md_carb_ind,
+    md_carb_ind_units,mn_carb_ind_as_ugC,md_carb_ind_as_ugC,
+    mn_size,mn_size_units,md_size,md_size_units,
+    aphia_id,taxon
+  )) %>% #names()
+  dplyr::filter(sample_date > "2022-06-01") %>% #names()
+  group_by(across(c(-abundance_m3,
+                    -mn_carb_ugC_per_m3,
+                    -md_carb_ugC_per_m3
+  ))) %>% 
+  summarise(abundance_m3 = sum(abundance_m3,na.rm = TRUE),
+            mn_carb_ugC_per_m3 = sum(mn_carb_ugC_per_m3,na.rm = TRUE),
+            md_carb_ugC_per_m3 = sum(md_carb_ugC_per_m3, na.rm = TRUE),
+            .groups = "drop") %>% #View()
+  dplyr::mutate(yday = lubridate::yday(sample_date)) %>% 
+  ## reorder sites by region
+  dplyr::mutate(biosys_short = factor(
+    biosys_short,
+    levels = unique(biosys_short[order(region)])
+  )
+  ) %>% 
+  ## create label variable
+  dplyr::mutate(regn_wb_lbl = paste0(vegan::make.cepnames(region),
+                                     "_",
+                                     vegan::make.cepnames(wb))) %>%
+  dplyr::mutate(regn_wb_biosys_lbl = paste0(vegan::make.cepnames(region),
+                                            "_",
+                                            vegan::make.cepnames(wb),
+                                            "_",
+                                            biosys_short)) %>%
+  dplyr::mutate(wb_biosys_lbl = paste0(
+    vegan::make.cepnames(wb),
+    "_",
+    biosys_short)) %>%
+  dplyr::mutate(regn_wb_lbl = factor(
+    regn_wb_lbl,
+    levels = unique(regn_wb_lbl[order(region)])
+  )
+  ) %>% 
+  dplyr::mutate(regn_wb_biosys_lbl = factor(
+    regn_wb_biosys_lbl,
+    levels = unique(regn_wb_biosys_lbl[order(region)])
+  )
+  ) %>% 
+  # Create separate column for phyto and zoops based on median carbon
+  dplyr::select(region,
+                wb_biosys_lbl,
+                regn_wb_biosys_lbl,
+                yday,sample_date,
+                data_set,
+                md_carb_ugC_per_m3
+  ) %>% 
+  pivot_wider(names_from = data_set,
+              values_from = md_carb_ugC_per_m3) %>% 
+  filter(complete.cases(.)) %>% 
+  mutate(c_ug_diff = Phytoplankton - Zooplankton,
+         c_ug_diff_log10 = log10(Phytoplankton) - log10(Zooplankton)
+  ) %>% 
+  dplyr::mutate(seas = seas::mkseas(sample_date,width="DJF")) %>% 
+  dplyr::select(region,wb_biosys_lbl,sample_date,
+                Phytoplankton,Zooplankton
+  ) %>% 
+  mutate(yr = year(sample_date)) %>% 
+  dplyr::select(-sample_date) %>% 
+  group_by(across(-c(Phytoplankton,Zooplankton))) %>% 
+  summarise(Phytoplankton = median(Phytoplankton),
+            Zooplankton = median(Zooplankton),
+            .groups = "drop") %>% 
+  mutate(c_ug_diff_log10 = log10(Phytoplankton) - log10(Zooplankton)) %>% 
+  mutate(abv_zero = case_when(
+    c_ug_diff_log10 >0 ~ "Above",
+    c_ug_diff_log10 <0 ~ "Below",
+    # TRUE ~ NA_real_
+  )) %>% 
+  ggplot(., aes(
+    # x = yday,
+    x = yr,
+    # x = sample_date,
+    y = c_ug_diff_log10,
+    # colour = abv_zero,
+    shape = abv_zero,
+    fill = abv_zero,
+  )
+  )+
+  geom_rect(
+    data = rect_data,
+    aes(xmin = -Inf, xmax = Inf, ymin = -Inf, ymax = 0),
+    fill = "lightblue",
+    alpha = 0.4,
+    inherit.aes = FALSE
+  ) +
+  geom_rect(
+    data = rect_data,
+    aes(xmin = -Inf, xmax = Inf, ymin = 0, ymax = Inf),
+    fill = "lightgreen",
+    alpha = 0.4,
+    inherit.aes = FALSE
+  )+
+  geom_hline(yintercept = 0, lty = 2)+
+  geom_hline(yintercept = c(1,-1),lty=3)+
+  geom_jitter(show.legend = FALSE, size = 2, width = 0.1)+
+  # geom_point(show.legend = FALSE,
+  #            size = 2
+  #            )+
+  scale_shape_manual(values = c(21,24))+
+  scale_fill_manual(values=c("green","blue"))+
+  ggh4x::facet_wrap2(
+    vars(region,wb_biosys_lbl),
+    strip = ggh4x::strip_nested(bleed = TRUE)
+  )+
+  labs(title = bquote(bold("Estimated difference in "~log[10][(n+1)]~"median carbon content in phytoplankton vs zooplankton populations")),
+       subtitle = "<b><span style='color:darkgreen;'>Positive values</span></b> indicate majority of carbon stored within <b><span style='color:darkgreen;'>phytoplankton</span></b><br><b><span style='color:blue;'>Negative values</span></b> indicate majority of carbon stored within <b><span style='color:blue;'>zooplankton,</span>",
+       caption = "Only sampling occasions with data for both phytoplankton and zooplankton are presented",
+       y=bquote(bold(log[10][(n+1)]~Carbon~content~"(as ug C/m3)")))+
+  theme(
+    plot.title = element_text(face=2),
+    plot.caption = element_text(face=2,size = 12),
+    plot.subtitle = ggtext::element_markdown(),
+    axis.title.x = element_blank(),
+    axis.title.y = element_text(face=2),
+    axis.text.x = element_text(face=2,size=12),
+    axis.text.y = element_text(face=2,size=9),
+    legend.title = element_blank(),
+    legend.text = element_text(face=2,size=12),
+    strip.text = element_text(face=2),
+    strip.background = element_rect(color = 1),
+  )
+ggsave(plot = get_last_plot(),
+       filename = paste0("outputs/figs/ts_phytZoop_diff_log10_median_year.tiff"),
+       width = 18, height = 8, units = "in"
+       )
