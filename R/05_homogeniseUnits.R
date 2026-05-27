@@ -114,7 +114,7 @@ dfall_use %>%
   geom_jitter(
     # pch=21,
     width = 0.75)+
-  scale_fill_manual(values=c("green","white","blue","white"))+
+  scale_fill_manual(values=c("green","black","blue","yellow"))+
   scale_colour_manual(values = c("darkgreen","darkblue","darkgreen","darkblue"))+
   scale_shape_manual(values = c(21,21,24,24))+
   facet_wrap(.~region) +
@@ -483,7 +483,7 @@ dfall_use_plots_2 <- dfall_use_plots %>%
                                   "Protozoa",
                                   "Other"
                                   ))) %>% 
-  select(-c(lifeform)) %>% 
+  dplyr::select(-c(lifeform)) %>% 
   dplyr::group_by(across(c(
     -abundance_m3,
     -mn_carb_ugC_per_m3,
