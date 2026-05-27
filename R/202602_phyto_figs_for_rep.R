@@ -18,7 +18,7 @@ fac_tmp <- sprintf("%04d%02d", rep(2000:2025, each = 12), 1:12)
 
 ## keep only 'interesting' variables
 df <- df0 %>% 
-  select(sample_id,rbd,wb_name,sample_date,phyto_lf,name_use,
+  dplyr::select(sample_id,rbd,wb_name,sample_date,phyto_lf,name_use,
          cells_per_litre:md_carbon_tot_mg_c_per_m3
          ) %>% 
   # create yyymm variable & move it
@@ -159,15 +159,15 @@ df$rbd <- factor(df$rbd, levels = c(
   ))
 
 png(file = paste0(outfol,
-                  # "phyto_carbon_log10_by_rbd.png"
-                  "phyto_carbon_raw.png"
+                  "phyto_carbon_log10_by_rbd.png"
+                  # "phyto_carbon_raw.png"
                   # "phyto_carbon_log10.png"
                   # "phyto_carbon_log10_by_rbd_with_line.png"
                   ),
     width=18*ppi, height=12*ppi, res=ppi)
 df %>% #names()
   ## total carbon: cells per litre
-  select(sample_id,date_plot,md_carbon_tot_ug_c_per_m3,rbd) %>% 
+  dplyr::select(sample_id,date_plot,md_carbon_tot_ug_c_per_m3,rbd) %>% 
   ##remove zero values
   dplyr::filter(!is.na(md_carbon_tot_ug_c_per_m3)) %>% 
   group_by(across(-md_carbon_tot_ug_c_per_m3)) %>% 
@@ -179,7 +179,10 @@ df %>% #names()
   # get mean sum by date
   ## drop sample ID
   # select(-sample_id) %>%
-  select(-sample_id,-rbd) %>%
+  dplyr::select(
+    -sample_id,
+    # -rbd
+    ) %>%
   group_by(across(-md_carbon_tot_ug_c_per_m3)) %>%
   # filter(!is.na(md_carbon_tot_mg_C_per_litre))
   summarise(md_carbon_tot_ug_c_per_m3 = median(md_carbon_tot_ug_c_per_m3,na.rm=TRUE),
@@ -189,8 +192,8 @@ df %>% #names()
          aes(
            x = date_plot,
            # y = cells_per_litre
-           y = md_carbon_tot_ug_c_per_m3,
-           # y = log10(md_carbon_tot_ug_c_per_m3+1)
+           # y = md_carbon_tot_ug_c_per_m3,
+           y = log10(md_carbon_tot_ug_c_per_m3+1)
          )
   )+
   geom_rug(sides = "b")+
@@ -211,13 +214,13 @@ df %>% #names()
   geom_point(aes(fill = n),size=4,pch=21)+
   # geom_hline(yintercept = 4,col=2,lwd=1.5)+
   geom_smooth(method = "gam")+
-  # facet_wrap(.~rbd)+
+  facet_wrap(.~rbd)+
   ylim(0,NA)+
   labs(
-    # title = "Log10 median phytoplanton carbon content by year_month",
-    title = "Median phytoplankton carbon content by year_month",
-    # y = "Log10(n+1) median carbon content (ug/m3) per sample",
-    y = "Median carbon content (ug/m3) per sample",
+    title = "Log10 median phytoplanton carbon content by year_month",
+    # title = "Median phytoplankton carbon content by year_month",
+    y = "Log10(n+1) median carbon content (ug/m3) per sample",
+    # y = "Median carbon content (ug/m3) per sample",
     caption=paste0("Values represent median total carbon contents across all samples gathered in a particular month","<br>",
                    "Point shading reflects number of samples contributing to that mean",
                    "<br>","Blue line represents generalised additive model trend"
@@ -286,10 +289,10 @@ df %>% #names()
   facet_wrap(.~rbd)+
   ylim(0,NA)+
   labs(
-    # title = "Log10 median phytoplanton carbon content by year_month",
-    title = "Median phytoplankton carbon content by year_month",
-    # y = "Log10(n+1) median carbon content (ug/m3) per sample",
-    y = "Median carbon content (ug/m3) per sample",
+    title = "Log10 median phytoplanton carbon content by year_month",
+    # title = "Median phytoplankton carbon content by year_month",
+    y = "Log10(n+1) median carbon content (ug/m3) per sample",
+    # y = "Median carbon content (ug/m3) per sample",
     caption=paste0("Values represent median total carbon contents across all samples gathered in a particular month","<br>",
                    "Point shading reflects number of samples contributing to that mean",
                    "<br>","Blue line represents generalised additive model trend"
