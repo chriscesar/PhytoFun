@@ -82,7 +82,8 @@ df_phyto0 %>%
   group_by(across(-abund_per_l)) %>%
   summarise(abund_per_l=sum(abund_per_l),.groups = "drop") %>% 
   ungroup() %>% 
-  pivot_wider(.,names_from = taxonKey_taxQual, values_from = abund_per_l,values_fill = 0) -> df_phytow
+  pivot_wider(.,names_from = taxonKey_taxQual,
+              values_from = abund_per_l,values_fill = 0) -> df_phytow
 
 ### format dates
 df_phytow$SAMPLE_DATE <- as.Date(df_phytow$SAMPLE_DATE, format = "%d/%m/%Y")
