@@ -161,7 +161,7 @@ record_info <- left_join(aphia_all,record_info, by = "aphia_id")
 write.csv(record_info, "outputs/phyto_taxon_info.csv",row.names = FALSE)
 
 ## sanity check: are all names in our phyto data in the record_info object?
-table(df_phyto0$taxa_name %in% record_info$taxa_name)
+print("####################################################");print("Do all names in phyto data match?");print(paste0("######    ",table(df_phyto0$taxa_name %in% record_info$taxa_name)));print("####################################################")
 
 ### Quick tidy
 rm(aphia_all,aphia_ids,aphia_ids_na,aphia_ids_non_na)
@@ -502,12 +502,13 @@ zooptrm <- df_zoop %>%
 ### Phyto ----
 ## Prep phyto data ####
 # retain 'sensible' variables
-phytotrm <- df_phyto %>% dplyr::select(
+df_phyto %>% names()
+  dplyr::select(
   sample_id,
   sample_date,
   biosys_code_short,
   data_set,
-  valid_aphia_id,
+  aphia_id,
   taxa_name,
   river_basi,
   wb_id,
