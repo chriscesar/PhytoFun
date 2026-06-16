@@ -343,7 +343,7 @@ df_phyto %>%
   )) %>% 
   # ... and update units variable
   dplyr::mutate(abundance_units = case_when(
-    abundance_units == "error" ~ "cells_per_litre",
+    abundance_units == "error" ~ "cells per litre",
     abundance_units != "error" ~ abundance_units
   )) %>% 
   # remove cells and colonies variables
@@ -396,7 +396,7 @@ toc(log=TRUE)
 # script: '03_JoinPhytoZoops.R
 # 00400 Load, format & append zooplankton data ----
 ## load zoop data
-tic("load zoop data")
+tic("load & format zoop data")
 df_zoop <- read.csv((paste0(zoopfol,"processedData/zoopsAll.csv"))) %>% 
   # dfzoop <- read.csv("data/zoopsAll.csv") %>% 
   mutate(Biosys_short = if_else(
@@ -422,28 +422,19 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
   dplyr::filter(!is.na(net_volume_sampled_m3)) %>%
   dplyr::select(
     pot_number,
-    # Pot.Number,
     sample_date,
     biosys_short,
-    # Biosys_short,
     data_set,
     aphia_id,
-    # Aphia.ID,
     taxa,
     region,
     wbid,
     wb,
     eastings,
     northings,
-    # Eastings,
-    # Northings,
-    # LF02,
     lf02,
     kingdom:display_name,
-    # Kingdom, Phylum,Class,Order,Family,Genus,
-    abund_m3,# Abund_m3,
-    # net_volume_sampled_m3,
-    mn_carb_tot_m3_ug,
+    abund_m3,mn_carb_tot_m3_ug,
     md_carb_tot_m3_ug,
     mn_c_per_indiv_ug,
     md_c_per_indiv_ug,
@@ -462,11 +453,7 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
   dplyr::relocate(subphylum_subdivision,.after = subphylum) %>% 
   ## create 'units' columns
   dplyr::mutate(
-    abund_m3_units = "Count_per_m3",
-    # mn_carb_tot_units = "ugC_per_m3",
-    # md_carb_tot_units = "ugC_per_m3",
-    # mn_c_per_indiv_ug_units = "ugC_per_inividual",
-    carb_tot_units = "ugC per m3",
+    abund_m3_units = "count per m3",carb_tot_units = "ugC per m3",
     c_per_ind_units = "ugC per inividual",
     mnlong_max_axis_mm_units = "mm",
     mdlong_max_axis_mm_units = "mm"
@@ -480,12 +467,8 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     abundance_units = abund_m3_units,
     mn_carbTot = mn_carb_tot_m3_ug,
     md_carbTot = md_carb_tot_m3_ug,
-    # mn_carbTot_units = mn_carb_tot_units,
-    # md_carbTot_units = md_carb_tot_units,
     mn_carbInd = mn_c_per_indiv_ug,
-    # mn_carbInd_units = mn_c_per_indiv_ug_units,
     md_carbInd = md_c_per_indiv_ug,
-    # md_carbInd_units = md_c_per_indiv_ug_units,
     mn_size = mnlong_max_axis_mm,
     md_size = mdlong_max_axis_mm,
     mn_size_units = mnlong_max_axis_mm_units,
@@ -508,7 +491,6 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     lifeform,
     kingdom:subspecies,# kingdom,phylum,class,order,family,genus,
     abundance,abundance_units,
-    # net_volume_sampled_m3,
     mn_carb_tot,,
     md_carb_tot,carb_tot_units,
     mn_carb_ind,,
@@ -517,10 +499,9 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     md_size,md_size_units
     ) %>% 
   dplyr::mutate(
-    c_per_ind_units = "ugC_per_inividual"
+    c_per_ind_units = "ugC per inividual"
     ) %>% 
   dplyr::relocate(c_per_ind_units, .after = md_carb_ind) %>% 
-  # dplyr::select(-c(mn_carb_ind_units,md_carb_ind_units)) %>% 
   # convert all variables to character to allow easier joining
   mutate(across(everything(), as.character)) %>% 
   dplyr::mutate(
@@ -529,13 +510,9 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     -c(mn_size_units,md_size_units)
     ) %>% 
   as_tibble()
+toc(log=TRUE)
 
-##################################
-##################################
-## FROM HERE####
-##################################
-##################################
-
+tic("Format phyto data")
 ### Phyto ----
 ## Prep phyto data ####
 # retain 'sensible' variables
@@ -554,60 +531,34 @@ df_phyto %>% #names()
   northings,
   phyto_lf,
   kingdom:variety,
-  # kingdom,phylum,class,order,family,genus,
   abundance,
   abundance_units,
   c_total_mean,
   c_total_median,
   c_total_sample_units,
-  # tot_mn_c_pg_c_per_l,
-  # tot_md_c_pg_c_per_l,
   c_per_ind_mean,
   c_per_ind_median,
   c_per_ind_units,
-  # mean_c_per_cell_pg_c,
-  # median_c_per_cell_pg_c,
   cell_vol_ind_mean,
   cell_vol_ind_median,
   cell_vol_ind_units,
-  # mean_vol_per_cell_um3,
-  # median_vol_per_cell_um3,
-  # mean_c_per_cell_pg_c,
-  # median_c_per_cell_pg_c
-) %>% 
+  ) %>% 
   # rename for consistency
   dplyr::rename(
     region = river_basi,
-    #   wb_id = wb_id,
     wb = wb_name,
     biosys_short = biosys_code_short,
     carb_tot_units = c_total_sample_units,
     mn_carb_ind = c_per_ind_mean,
     md_carb_ind = c_per_ind_median,
-  
-  #   sample_date=sample_date,
-  #   data_set = DataSet,
-  #   aphia_id = valid_aphia_id,
     taxon = taxa_name,
     lifeform = phyto_lf,
     mn_carb_tot = c_total_mean,
-  # mn_carb_tot_units = c_units,
-  #   mn_carb_tot_units = tot_mn_c_pg_c_per_l_units,
     md_carb_tot = c_total_median,
-  #   md_carb_tot_units = tot_md_c_pg_c_per_l_units,
-  #   mn_carb_ind = mean_c_per_cell_pg_c,
-  #   mn_carb_ind_units = mean_c_per_cell_pg_c_units,
-  #   md_carb_ind = median_c_per_cell_pg_c,
-  #   md_carb_ind_units = median_c_per_cell_pg_c_units,
-  #   mn_size = mean_vol_per_cell_um3,
-  #   mn_size_units = mean_vol_per_cell_um3_units,
-  #   md_size = median_vol_per_cell_um3,
-  #   md_size_units = median_vol_per_cell_um3_units,
-  mn_size = cell_vol_ind_mean,
-  md_size = cell_vol_ind_median,
-  size_units = cell_vol_ind_units,
-  ) %>%
-  # janitor::clean_names() %>% 
+    mn_size = cell_vol_ind_mean,
+    md_size = cell_vol_ind_median,
+    size_units = cell_vol_ind_units,
+    ) %>%
   ## reorder columns to match
   dplyr::select(
     sample_id,region,wb_id,wb,
@@ -625,43 +576,170 @@ df_phyto %>% #names()
     carb_tot_units,
     mn_carb_ind,
     md_carb_ind,
-    # c_per_ind_median,
     c_per_ind_units,
-    # cell_vol_ind_mean,
-    # cell_vol_ind_median,
-    # cell_vol_ind_units
     mn_size,
     md_size,
     size_units,
   ) %>% 
   # add 'empty' columns to match zoops
   dplyr::mutate(
-    infraorder =NA_character_,
-    parvorder=NA_character_,
-    tribe=NA_character_,
+    infraorder = NA_character_,
+    parvorder = NA_character_,
+    tribe = NA_character_,
     section = NA_character_,
     subsection = NA_character_,
     subspecies = NA_character_,
     ) %>% 
 dplyr::relocate(
-  infraorder,parvorder, .after = suborder
+  infraorder,
+  parvorder,
+  .after = suborder
   ) %>% 
-  dplyr::relocate(section,subsection,subspecies,
+  dplyr::relocate(section,
+                  subsection,
+                  subspecies,
                   .after = variety) %>% 
   dplyr::relocate(
     tribe, .after = subfamily) %>% 
   # convert all variables to character to allow easier joining
   mutate(across(everything(), as.character)) -> phytotrm
+toc(log=TRUE)
 
+tic("Format joined data")
 # sense check: Do names match?
 print("DO ALL NAMES MATCH?");table(names(zooptrm) == names(phytotrm))
 
-# Join to a single df ####
+# Join to a single df & format ----
 df_all <- rbind(phytotrm, zooptrm)
+
+df_all %>% 
+# homogenise RBD names
+mutate(region = case_when(
+  region == "Anglian" ~ "Anglian",
+  region == "Humber" ~ "Humber",
+  region == "NEast" ~ "Northumbria",
+  region == "North West" ~ "North West",
+  region == "Northumbria" ~ "Northumbria",
+  region == "NWest" ~ "North West",
+  region == "Severn" ~ "Severn",
+  region == "Solway Tweed" ~ "Solway Tweed",
+  region == "South East" ~ "South East",
+  region == "South West" ~ "South West",
+  region == "Southern" ~ "South East",
+  region == "SWest" ~ "South West",
+  region == "Thames" ~ "Thames",
+  TRUE ~ NA_character_
+  ))  %>% 
+  mutate(
+    region = factor(region, levels = c(
+      "Northumbria","Humber", "Anglian",
+      "Thames","South East","South West",
+      "Severn","North West","Solway Tweed"
+      )
+      )
+    )-> df_all
 
 ## Quick tidy
 rm(df_phyto, df_zoop, phytotrm, zooptrm, zoop_meta, df_phyto0_old)
 
-### NEXT:
-# script: '05_homogeniseUnits.R'
+toc(log = TRUE)
 
+## Format numeric variables to numeric ----
+### create backup version for auditing ----
+tic("Homogenise units")
+
+df_all0 <- df_all
+
+df_all %>% 
+  dplyr::mutate(
+    abundance = as.numeric(abundance),
+    mn_carb_tot = as.numeric(mn_carb_tot),
+    md_carb_tot = as.numeric(md_carb_tot),
+    mn_carb_ind = as.numeric(mn_carb_ind),
+    md_carb_ind = as.numeric(md_carb_ind),
+    mn_size = as.numeric(mn_size),
+    md_size = as.numeric(md_size),
+    ) %>% 
+  ### NEXT: Convert to consistent units using
+  # script: '03_JoinPhytoZoops.R'
+  #### Mean & Median CARBON PER INDIVIDUAL AS ugC ----
+  dplyr::mutate(
+    mn_carb_ind_as_ugC = case_when(
+      c_per_ind_units == "ugC per inividual" ~ mn_carb_ind,
+      c_per_ind_units == "pg C per individual" ~ mn_carb_ind/1e6,
+      TRUE ~ NA_real_
+      ),
+    md_carb_ind_as_ugC = case_when(
+      c_per_ind_units == "ugC per inividual" ~ md_carb_ind,
+      c_per_ind_units == "pg C per individual" ~ md_carb_ind/1e6,
+      TRUE ~ NA_real_
+      )) %>% 
+  #### ABUNDANCE PER M3 ----
+  dplyr::mutate(
+    abundance_m3 = case_when(
+      abundance_units == "count per m3" ~ abundance,
+      abundance_units == "cells per litre" ~ abundance*1000,
+      abundance_units == "colonies per litre" ~ abundance*1000,
+      TRUE ~ NA_real_
+      )
+    ) %>% 
+  ## multiply carbon per individual by abundance/m3
+  ##to show carbon per m3
+  dplyr::mutate(
+    mn_carb_ugC_per_m3 = abundance_m3*mn_carb_ind_as_ugC,
+    md_carb_ugC_per_m3 = abundance_m3*md_carb_ind_as_ugC) -> df_all
+
+# Assign label region names for WBs
+df_all %>% 
+  dplyr::mutate(
+    region_lab = case_when(
+      region == "North West" ~ "NW",
+      region == "Anglian" ~ "Ang",
+      region == "South East" ~ "SE",
+      region == "Thames" ~ "Thm",
+      region == "South West" ~ "SW",
+      region == "Northumbria" ~ "Nmb",
+      region == "Solway Tweed" ~ "SolTw",
+      region == "Humber" ~ "Hmb",
+      region == "Severn" ~ "Sev",
+      TRUE ~ NA_character_
+      )
+    ) %>% 
+  dplyr::mutate(
+    region_lab = factor(region_lab,
+                        levels = c(
+                          "Nmb", "Hmb", "Ang",
+                          "Thm", "SE", "SW",
+                          "Sev", "NW", "SolTw"
+                          )
+                        )) -> df_all
+toc(log = TRUE)
+
+# Export data ----
+tic("Export data")
+
+saveRDS(
+  df_all,
+  file = "outputs/ZoopPhyto_long_USE.Rdat"
+  )
+
+write.csv(
+  df_all,
+  file = "outputs/ZoopPhyto_long_USE.csv",
+  row.names = FALSE
+  )
+
+toc(log=TRUE)
+
+unlist(tictoc::tic.log())
+
+# Tidy up ####
+rm(list = ls(pattern = "^df"))
+rm(list = ls(pattern = "^cb"))
+rm(ppi,GISfol,theme_use,unique_names,zoopfol)
+
+detach("package:tidyverse", unload=TRUE)
+detach("package:tidyr", unload=TRUE)
+detach("package:tictoc", unload=TRUE)
+detach("package:worrms", unload=TRUE)
+detach("package:purrr", unload=TRUE)
