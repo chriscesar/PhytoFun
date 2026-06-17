@@ -15,6 +15,8 @@ rm(ld_pkgs)
 tictoc::tic.clearlog() ##clear log
 
 source("R/000setup.R")
+# remove unnecessary items from setup code
+rm(list = ls(pattern = "^cb"));rm(ppi,theme_use)
 
 # 00100 Import data extracted from BIOSYS using BOXI query ----
 # tic("DATA IMPORT: Downloading, importing & loading data")
@@ -38,10 +40,10 @@ source("R/000setup.R")
 #         file = "outputs/Phyto_raw_extract.Rdat")
 # toc(log=TRUE)
 
-tic("Load data")
+tictoc::tic("Load data")
 # Load raw data from Rdat file (quicker processing) ----
 df_phyto0 <- readRDS(file = "outputs/Phyto_raw_extract.Rdat")
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
 # 00200 Format names & add carbon values ----
 
@@ -59,7 +61,7 @@ toc(log=TRUE)
 unique_names <- unique(df_phyto0$taxa_name)
 
 ## Extract & append Aphia IDs ----
-tic("Query AphiaID for each name")
+tictoc::tic("Query AphiaID for each name")
 aphia_ids <- map_dfr(unique_names, function(taxon) {
   result <- tryCatch(
     {
@@ -80,10 +82,10 @@ aphia_ids <- map_dfr(unique_names, function(taxon) {
   })
 
 aphia_ids |> rename("taxa_name" = "name") ->aphia_ids
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
 ## Generate Worms records ----
-tic("Generate Worms record")
+tictoc::tic("Generate Worms record")
 
 # Helper function: build classification wide table for a given vector of Aphia IDs
 build_classification_wide <- function(aphia_vec,
@@ -136,10 +138,10 @@ aphia_ids_non_na <- aphia_ids |> filter(!is.na(aphia_id))
 # 
 # write.csv(record_info,
 #           file="outputs/record_info1_non_na.csv",row.names = FALSE)
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
 ## Fill in missing Aphia IDs ----
-tic("Fill in missing Aphia IDs")
+tictoc::tic("Fill in missing Aphia IDs")
 aphia_ids_na <- read.csv("outputs/MissingAphiaLookup.csv") %>%
   #created manually
   janitor::clean_names(.) %>% 
@@ -148,9 +150,9 @@ aphia_ids_na <- read.csv("outputs/MissingAphiaLookup.csv") %>%
 
 aphia_all <- rbind(aphia_ids_non_na,aphia_ids_na)
 
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
-tic("Extract classification info from WORMS")
+tictoc::tic("Extract classification info from WORMS")
 ## Extract classification info from WORMS ####
 record_info <- build_classification_wide(
   aphia_all$aphia_id,
@@ -161,14 +163,14 @@ record_info <- left_join(aphia_all,record_info, by = "aphia_id")
 write.csv(record_info, "outputs/phyto_taxon_info.csv",row.names = FALSE)
 
 ## sanity check: are all names in our phyto data in the record_info object?
-print("####################################################");print("Do all names in phyto data match?");print(paste0("######    ",table(df_phyto0$taxa_name %in% record_info$taxa_name)));print("####################################################")
+print("####################################################"); print("Do all names in phyto data match?"); print(paste0("######    ",table(df_phyto0$taxa_name %in% record_info$taxa_name)," of ",nrow(df_phyto0)));print("####################################################")
 
 ### Quick tidy
 rm(aphia_all,aphia_ids,aphia_ids_na,aphia_ids_non_na)
 rm(build_classification_wide)
-toc(log = TRUE)
+tictoc::toc(log = TRUE)
 
-tic("Import carbon data & append")
+tictoc::tic("Import carbon data & append")
 ## Import carbon data & append to aphia ID info ----
 dfcarb_summary <- readxl::read_xlsx("data/PhytoCarbon_blankFill.xlsx",
                                     sheet = "out") %>% 
@@ -239,9 +241,9 @@ df_phyto0 %>%
 
 ## tidy up
 rm(df_phyto0, aphia_carb,dfcarb_summary,record_info)
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
-tic("extract Biosys code from site_station_name")
+tictoc::tic("extract Biosys code from site_station_name")
 ## extract BIOSYS codes from site_station_name
 # extract Biosys code from site_station_name ###
 site_station_name <- unique(df_phyto$site_station_name)
@@ -274,9 +276,9 @@ df_phyto %>%
   dplyr::select(-tmp) -> df_phyto
 
 rm(biosys_wip, site_station_name)
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
-tic("Append lifeforms")
+tictoc::tic("Append lifeforms")
 # 00300 Append life form data ----
 lf_tmp <- readxl::read_xlsx("data/Masterlist-V7_working_EDIT_CC.xlsx",
                             sheet = "SpeciesInfoUSE") %>% 
@@ -297,7 +299,7 @@ df_phyto %>%
 
 df_phyto <- janitor::clean_names(df_phyto)
 rm(lf_tmp)
-toc(log = TRUE)
+tictoc::toc(log = TRUE)
 
 ## 00310 Explicitly state units used ----
 tictoc::tic("Explicitly state units")
@@ -390,13 +392,14 @@ df_phyto %>%
   dplyr::mutate(c_total_sample_units = "pg C per litre") %>% 
   dplyr::relocate(c_total_mean, c_total_median,c_total_sample_units,
                   .after = c_per_ind_median) -> df_phyto
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
 ### NEXT:
 # script: '03_JoinPhytoZoops.R
 # 00400 Load, format & append zooplankton data ----
 ## load zoop data
-tic("load & format zoop data")
+
+tictoc::tic("load & format zoop data")
 df_zoop <- read.csv((paste0(zoopfol,"processedData/zoopsAll.csv"))) %>% 
   # dfzoop <- read.csv("data/zoopsAll.csv") %>% 
   mutate(Biosys_short = if_else(
@@ -409,7 +412,7 @@ df_zoop <- read.csv((paste0(zoopfol,"processedData/zoopsAll.csv"))) %>%
 df_zoop$data_set <- "Zooplankton"
 
 zoop_meta <- readxl::read_xlsx(paste0(zoopfol,
-                                      "processedData/260114_MBA_Returns_Amalgamated_USE.xlsx"),
+                                      "processedData/260608_MBA_Returns_Amalgamated_USE.xlsx"),
                                sheet = "SiteMeta") %>% 
   dplyr::select(-Region...8) %>% 
   dplyr::rename(Region = Region...11) %>% 
@@ -510,9 +513,9 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     -c(mn_size_units,md_size_units)
     ) %>% 
   as_tibble()
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
-tic("Format phyto data")
+tictoc::tic("Format phyto data")
 ### Phyto ----
 ## Prep phyto data ####
 # retain 'sensible' variables
@@ -603,51 +606,23 @@ dplyr::relocate(
     tribe, .after = subfamily) %>% 
   # convert all variables to character to allow easier joining
   mutate(across(everything(), as.character)) -> phytotrm
-toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
-tic("Format joined data")
+tictoc::tic("Format joined data")
 # sense check: Do names match?
 print("DO ALL NAMES MATCH?");table(names(zooptrm) == names(phytotrm))
 
 # Join to a single df & format ----
 df_all <- rbind(phytotrm, zooptrm)
 
-df_all %>% 
-# homogenise RBD names
-mutate(region = case_when(
-  region == "Anglian" ~ "Anglian",
-  region == "Humber" ~ "Humber",
-  region == "NEast" ~ "Northumbria",
-  region == "North West" ~ "North West",
-  region == "Northumbria" ~ "Northumbria",
-  region == "NWest" ~ "North West",
-  region == "Severn" ~ "Severn",
-  region == "Solway Tweed" ~ "Solway Tweed",
-  region == "South East" ~ "South East",
-  region == "South West" ~ "South West",
-  region == "Southern" ~ "South East",
-  region == "SWest" ~ "South West",
-  region == "Thames" ~ "Thames",
-  TRUE ~ NA_character_
-  ))  %>% 
-  mutate(
-    region = factor(region, levels = c(
-      "Northumbria","Humber", "Anglian",
-      "Thames","South East","South West",
-      "Severn","North West","Solway Tweed"
-      )
-      )
-    )-> df_all
-
 ## Quick tidy
 rm(df_phyto, df_zoop, phytotrm, zooptrm, zoop_meta, df_phyto0_old)
 
-toc(log = TRUE)
+tictoc::toc(log = TRUE)
 
 ## Format numeric variables to numeric ----
 ### create backup version for auditing ----
-tic("Homogenise units")
-
+tictoc::tic("Homogenise units")
 df_all0 <- df_all
 
 df_all %>% 
@@ -689,8 +664,36 @@ df_all %>%
     mn_carb_ugC_per_m3 = abundance_m3*mn_carb_ind_as_ugC,
     md_carb_ugC_per_m3 = abundance_m3*md_carb_ind_as_ugC) -> df_all
 
-# Assign label region names for WBs
+tictoc::toc(log = TRUE)
+
+#= Assign label region names for WBs ----
+tictoc::tic("Factorise regions & WBs")
 df_all %>% 
+  # homogenise RBD names
+  mutate(region = case_when(
+    region == "Anglian" ~ "Anglian",
+    region == "Humber" ~ "Humber",
+    region == "NEast" ~ "Northumbria",
+    region == "North West" ~ "North West",
+    region == "Northumbria" ~ "Northumbria",
+    region == "NWest" ~ "North West",
+    region == "Severn" ~ "Severn",
+    region == "Solway Tweed" ~ "Solway Tweed",
+    region == "South East" ~ "South East",
+    region == "South West" ~ "South West",
+    region == "Southern" ~ "South East",
+    region == "SWest" ~ "South West",
+    region == "Thames" ~ "Thames",
+    TRUE ~ NA_character_
+  ))  %>% 
+  mutate(
+    region = factor(region, levels = c(
+      "Northumbria","Humber", "Anglian",
+      "Thames","South East","South West",
+      "Severn","North West","Solway Tweed"
+      )
+      )
+    ) %>% 
   dplyr::mutate(
     region_lab = case_when(
       region == "North West" ~ "NW",
@@ -713,7 +716,179 @@ df_all %>%
                           "Sev", "NW", "SolTw"
                           )
                         )) -> df_all
-toc(log = TRUE)
+
+## Factorise water body names by region ----
+northumbria_levels <- c(
+  "Northumberland North",
+  "Holy Island & Budle Bay",
+  "Farne Islands to Newton Haven",
+  "Northumberland South",
+  "BLYTH (N)",
+  "TYNE",
+  "Tyne and Wear",
+  "WEAR",
+  "TEES",
+  "Tees Coastal"
+  )
+
+humber_levels <- c(
+  "Yorkshire North",
+  "ESK (E)",
+  "Yorkshire South",
+  "HUMBER LOWER",
+  "HUMBER MIDDLE",
+  "HUMBER UPPER"
+  )
+
+anglian_levels <- c(
+  "Wash Outer",
+  "WASH INNER",
+  "Lincolnshire",
+  "Lincs Offshore",
+  "Norfolk North",
+  "Norfolk East",
+  "BURE & WAVENEY & YARE & LOTHING",
+  "Suffolk",
+  "ORWELL",
+  "STOUR (ESSEX)",
+  "Harwich Approaches",
+  "Essex",
+  "BLACKWATER",
+  "Blackwater Outer",
+  "WITHAM",
+  "GREAT OUSE"
+  )
+
+thames_levels <- c(
+  "Thames Coastal North",
+  "THAMES LOWER",
+  "THAMES MIDDLE",
+  "THAMES UPPER",
+  "MEDWAY",
+  "SWALE",
+  "Murston Lakes"
+  )
+
+se_levels <- c(
+  "STOUR (KENT)",
+  "Kent North",
+  "Whitstable Bay",
+  "Thames Coastal South",
+  "Kent South",
+  "ROTHER",
+  "Sussex East",
+  "Sussex",
+  "OUSE",
+  "ADUR",
+  "ARUN",
+  "CUCKMERE",
+  "PAGHAM HARBOUR",
+  "CHICHESTER HARBOUR",
+  "LANGSTONE HARBOUR",
+  "PORTSMOUTH HARBOUR",
+  "Solent",
+  "SOUTHAMPTON WATER",
+  "BEAULIEU RIVER",
+  "LYMINGTON",
+  "WESTERN YAR",
+  "NEWTOWN RIVER",
+  "Isle of Wight East",
+  "EASTERN YAR",
+  "MEDINA"
+  )
+
+
+sw_levels <- c(
+  "Dorset / Hampshire",
+  "Weymouth Bay",
+  "Portland Harbour",
+  "Fleet Lagoon",
+  "Lyme Bay East",
+  "Lyme Bay West",
+  "Devon South",
+  "TEIGN",
+  "EXE",
+  "Tor Bay",
+  "DART",
+  "Salcombe Harbour",
+  "KINGSBRIDGE",
+  "PLYMOUTH TAMAR",
+  "Plymouth Sound",
+  "Plymouth Coast",
+  "LOOE",
+  "Fowey",  # placeholder if appears later
+  "St Austell",
+  "CARRICK ROADS INNER",
+  "Carrick Roads Outer",
+  "Fal / Helford",
+  "HELFORD",
+  "Penzance",
+  "Lands End to Trevose Head",
+  "Cornwall South",
+  "Cornwall North",
+  "CAMEL",
+  "Barnstaple Bay",
+  "TAW / TORRIDGE",
+  "Bridgwater Bay",
+  "Bristol Channel Inner South",
+  "Bristol Channel Outer South",
+  "AVON",
+  "POOLE HARBOUR"
+  )
+
+severn_levels <- c(
+  "SEVERN MIDDLE",
+  "SEVERN UPPER",
+  "BRISTOL AVON"
+  )
+
+nw_levels <- c(
+  "Solway Outer South",
+  "Cumbria",
+  "LEVEN",
+  "Morecambe Bay",
+  "LUNE",
+  "WYRE",
+  "RIBBLE",
+  "KENT",
+  "Mersey Mouth",
+  "MERSEY"
+  )
+
+solway_levels <- c(
+  "TWEED",
+  "SOLWAY"
+  )
+
+## Create a single factor across all regions
+wb_levels <- c(
+  northumbria_levels,
+  humber_levels,
+  anglian_levels,
+  thames_levels,
+  se_levels,
+  sw_levels,
+  severn_levels,
+  nw_levels,
+  solway_levels
+)
+
+rm(northumbria_levels,
+   humber_levels,
+   anglian_levels,
+   thames_levels,
+   se_levels,
+   sw_levels,
+   severn_levels,
+   nw_levels,
+   solway_levels)
+
+df_all <- df_all %>%
+  mutate(
+    wb = factor(wb, levels = wb_levels)
+    )
+
+tictoc::toc(log = TRUE)
 
 # Export data ----
 tic("Export data")
@@ -735,7 +910,6 @@ unlist(tictoc::tic.log())
 
 # Tidy up ####
 rm(list = ls(pattern = "^df"))
-rm(list = ls(pattern = "^cb"))
 rm(ppi,GISfol,theme_use,unique_names,zoopfol)
 
 detach("package:tidyverse", unload=TRUE)
