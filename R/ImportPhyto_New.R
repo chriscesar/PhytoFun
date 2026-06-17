@@ -887,7 +887,7 @@ df_all <- df_all %>%
   mutate(
     wb = factor(wb, levels = wb_levels)
     )
-
+rm(wb_levels)
 tictoc::toc(log = TRUE)
 
 # Export data ----
