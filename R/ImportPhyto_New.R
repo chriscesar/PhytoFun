@@ -3,7 +3,7 @@
 ## Rebooted code to import and prep raw phytoplankton data from
 ## BIOSYS extract.  Replaces older versions
 ## DATE: 03/06/2026
-## DATE Last Updated: 
+## DATE Last Updated: 18/06/2026
 ## AUTHOR: Dr Christopher Cesar
 ## EDITORS:
 
@@ -816,7 +816,7 @@ sw_levels <- c(
   "Plymouth Sound",
   "Plymouth Coast",
   "LOOE",
-  "Fowey",  # placeholder if appears later
+  # "Fowey",  # placeholder if appears later
   "St Austell",
   "CARRICK ROADS INNER",
   "Carrick Roads Outer",
@@ -860,7 +860,8 @@ solway_levels <- c(
   "SOLWAY"
   )
 
-## Create a single factor across all regions
+## Create a single factor across all regions to put water bodies in the 
+## correct order across all regions
 wb_levels <- c(
   northumbria_levels,
   humber_levels,
@@ -890,8 +891,15 @@ df_all <- df_all %>%
 rm(wb_levels)
 tictoc::toc(log = TRUE)
 
+# Classify date variable ----
+tictoc::tic("Classify dates")
+df_all %>% 
+  dplyr::mutate(sample_date = lubridate::date(sample_date)
+                ) -> df_all
+tictoc::toc(log = TRUE)
+
 # Export data ----
-tic("Export data")
+tictoc::tic("Export data")
 
 saveRDS(
   df_all,
@@ -904,7 +912,7 @@ write.csv(
   row.names = FALSE
   )
 
-toc(log=TRUE)
+tictock::toc(log=TRUE)
 
 unlist(tictoc::tic.log())
 
