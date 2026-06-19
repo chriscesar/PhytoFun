@@ -391,7 +391,10 @@ df_phyto %>%
   ) %>% #names()
   dplyr::mutate(c_total_sample_units = "pg C per litre") %>% 
   dplyr::relocate(c_total_mean, c_total_median,c_total_sample_units,
-                  .after = c_per_ind_median) -> df_phyto
+                  .after = c_per_ind_median) %>% 
+  # remove 'zero abundance' rows which might cause issue
+  dplyr::filter(abundance != 0
+                )-> df_phyto
 tictoc::toc(log=TRUE)
 
 ### NEXT:
