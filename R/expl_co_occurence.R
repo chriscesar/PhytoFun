@@ -16,54 +16,67 @@ tictoc::tic.clearlog() ##clear log
 tictoc::tic("Load data and set metadata")
 ## set meta inputs
 source("R/000setup.R")
+# set ouput folder to save files
+output.location <- "//prodds.ntnl/Shared/AN/KFH/Groups/N_Marine/02 Projects_Tasks/04 E&B/Ecology and Ecosystems/Planktonic_Food_Webs/Co_occurrence/"
 
 ## load data
-df0 <- readRDS("outputs/ZoopPhyto_long_USE.Rdat")
+df0 <- readRDS("outputs/ZoopPhyto_long_USE.Rdat") %>% 
+  # convert date from character to date
+  dplyr::mutate(sample_date = lubridate::date(sample_date)) %>% 
+  # create year-day variable
+  dplyr::mutate(yday = lubridate::yday(sample_date)) %>% 
+  # create season variable
+  dplyr::mutate(seas = seas::mkseas(sample_date, width = "DJF"))
 tictoc::toc(log = TRUE)
 
+#check sample_id 607949
 # generate output of unique taxa in data ####
 # names(df0)
-# df0 %>% 
+# df0 %>%
 #   dplyr::select(
 #     data_set,
 #     taxon,
 #     aphia_id,
-#     lifeform, 
+#     lifeform,
 #     kingdom,
 #     subkingdom,
 #     infrakingdom,
-#     phylum,  
+#     phylum,
 #     phylum_division,
 #     subphylum,
 #     subphylum_subdivision,
-#     infraphylum,  
+#     infraphylum,
 #     parvphylum,
 #     gigaclass,
 #     superclass,
-#     class,  
+#     class,
 #     subclass,
 #     infraclass,
 #     subterclass,
-#     superorder,  
+#     superorder,
 #     order,
 #     suborder,
 #     infraorder,
-#     parvorder, 
+#     parvorder,
 #     superfamily,
 #     family,
 #     subfamily,
-#     tribe, 
+#     tribe,
 #     genus,
 #     subgenus,
 #     species,
-#     forma, 
+#     forma,
 #     variety,
 #     section,
 #     subsection,
 #     subspecies
-#     ) %>% distinct() %>% write.csv(.,
-#                                    file = "outputs/unique_taxa.csv",
-#                                    row.names = FALSE)
+#     ) %>%
+#   dplyr::count(dplyr::across(dplyr::everything()),
+#                name = "n_occurrences") %>% 
+#   # distinct() #%>%
+#   write.csv(.,
+#             file = "outputs/unique_taxa.csv",
+#             row.names = FALSE)
 
 # Flag taxa of interest ----
 tictoc::tic("Flag & generate data for taxa of interest")
@@ -217,18 +230,18 @@ df_all %>% dplyr::mutate(
     )
   ) -> df_all
 
-## Actinocyclus: Genus Actinocyclus
+## Actinocyclus: Genus Actinocyclus OR Genus Actinoptychus
 df_all %>% 
-  dplyr::filter(!is.na(genus) & genus == "Actinocyclus") %>% 
-  pull(.,aphia_id) %>% unique() -> aphia_actinocyclus
+  dplyr::filter(!is.na(genus) & genus %in% c("Actinocyclus", "Actinoptychus")) %>% 
+  pull(.,aphia_id) %>% unique() -> aphia_actinocyclus_actinoptychus
 
 df_all %>% dplyr::mutate(
-  actinocyclus_abund_m3 = case_when(
-    !is.na(aphia_id) & aphia_id %in% aphia_actinocyclus ~ abundance_m3,
+  actinocyclus_actinoptychus_abund_m3 = case_when(
+    !is.na(aphia_id) & aphia_id %in% aphia_actinocyclus_actinoptychus ~ abundance_m3,
     TRUE ~ NA_real_
   ),
-  actinocyclus_ugC_m3 = case_when(
-    !is.na(aphia_id) & aphia_id %in% aphia_actinocyclus ~ md_carb_ugC_per_m3,
+  actinocyclus_actinoptychus_ugC_m3 = case_when(
+    !is.na(aphia_id) & aphia_id %in% aphia_actinocyclus_actinoptychus ~ md_carb_ugC_per_m3,
     TRUE ~ NA_real_
     )
   ) -> df_all
@@ -313,13 +326,17 @@ df_all %>% dplyr::mutate(
   )
 ) -> df_all
 
+# Tidy up
 rm(aphia_phaeocystis,aphia_coccolith,aphia_chaetoceros,
-   aphia_skeletonema,aphia_thalassiosira,
+   aphia_actinocyclus_actinoptychus, aphia_skeletonema,aphia_thalassiosira,
    aphia_cerataulina,aphia_diatoms,aphia_odontella,aphia_coscinodiscus,
-   aphia_actinocyclus,aphia_dinoflagellata,aphia_pseudo_nitzschia,
+   aphia_dinoflagellata,aphia_pseudo_nitzschia,
    aphia_karenia,aphia_dinophysis,aphia_noctilucales)
 
-# tidy up data
+tictoc::toc(log = TRUE)
+
+# tidy up data & convert to long ----
+tictoc::tic("Convert to long")
 df_all %>% #names() %>% 
   ## trim data into variables of interest
   dplyr::select(
@@ -327,6 +344,9 @@ df_all %>% #names() %>%
     region,
     region_lab,
     wb_id, wb,
+    sample_date,
+    yday,
+    seas,
     # abundance_m3,
     # md_carb_ugC_per_m3,
     62:dplyr::last_col()
@@ -337,15 +357,165 @@ df_all %>% #names() %>%
       ~ !is.na(.x)
     )) %>%
   pivot_longer(
-    cols = -c(sample_id, region, region_lab, wb_id, wb),
-    names_to = c("species", ".value"),
+    cols = -c(sample_id, region, region_lab, wb_id, wb,sample_date, yday, seas),
+    names_to = c("taxon", ".value"),
     names_pattern = "(.*)_(abund_m3|ugC_m3)"
   ) %>%
   rename(
     abundance_m3 = abund_m3,
     ug_c_m3 = ugC_m3
   ) %>% 
-  dplyr::filter(!is.na(abundance_m3) & !is.na(ug_c_m3)
-                ) -> df_trim_l
+  # retain rows the have either abundance or carbon values
+  dplyr::filter(!is.na(abundance_m3) | !is.na(ug_c_m3)
+                ) %>% 
+  ## arrange by sample_id
+  dplyr::arrange(.,sample_id) -> df_trim_l
 
 tictoc::toc(log = TRUE)
+
+tictoc::tic("Generate summed taxa by sample dataframe")
+# Generate summed taxa by sample dataframe ----
+
+df_trim_l %>% 
+  dplyr::group_by(dplyr::across(-c(abundance_m3, ug_c_m3))) %>% 
+  dplyr::summarise(abundance_m3 = sum(abundance_m3, na.rm = TRUE),
+                   ug_c_m3 = sum(ug_c_m3, na.rm = TRUE),
+                   .groups = "drop") %>% dplyr::ungroup() %>% 
+  ## arrange by sample_id
+  dplyr::arrange(.,sample_id) -> df_trim_l_summary
+
+# write data
+
+write.csv(df_trim_l_summary,
+          file = paste0(output.location,
+                        "trimmed_phyto_taxa_of_interest_long.csv"),
+          row.names = FALSE
+          )
+
+tictoc::toc(log = TRUE)
+
+tictoc::tic("Produce correlation heatmap")
+# correlation heatmap ----
+taxa_mat <-
+  df_trim_l_summary %>%
+  select(sample_id, taxon, abundance_m3) %>%
+  group_by(sample_id, taxon) %>%
+  summarise(
+    abundance_m3 = sum(abundance_m3),
+    .groups = "drop"
+  ) %>%
+  pivot_wider(
+    names_from = taxon,
+    values_from = abundance_m3,
+    values_fill = 0
+  )
+
+# Load correlation package
+library(correlation);library(reshape2)
+
+cor_mat <-
+  taxa_mat %>%
+  select(-sample_id) %>%
+  cor(
+    method = "spearman",
+    use = "pairwise.complete.obs"
+  )
+
+# Keep lower triangle only
+cor_df <- as_tibble(melt(cor_mat))
+
+cor_df <- cor_df %>%
+  dplyr::mutate(Var1 = stringr::str_to_camel(as.character(Var1),first_upper = TRUE),
+                Var2 = stringr::str_to_camel(as.character(Var2),first_upper = TRUE),
+                Var1 = as.factor(Var1),
+                Var2 = as.factor(Var2),
+  ) %>% 
+  dplyr::filter(
+    as.numeric(Var1) > as.numeric(Var2)
+  )
+
+ggplot(
+  cor_df,
+  aes(
+    x = stringr::str_to_camel(as.character(Var1),first_upper = TRUE),
+    y = stringr::str_to_camel(as.character(Var2),first_upper = TRUE),
+    fill = value,
+  )
+) +
+  geom_hline(yintercept = seq(from = 0.5,
+                              to = length(unique(cor_df$Var1)),
+                              by = 1),
+             colour = "lightgrey",
+             lty = 2)+
+  geom_vline(xintercept = seq(from = 0.5,
+                              to = length(unique(cor_df$Var1)),
+                              by = 1),
+             colour = "lightgrey",
+             lty = 2)+
+  geom_tile(colour = "grey") +
+  scale_fill_gradient2(
+    low = "blue",
+    mid = "white",
+    high = "red",
+    midpoint = 0,
+    name = "Spearman\nrho"
+  ) +
+  coord_equal() +
+  # theme_bw() +
+  theme(
+    axis.text.x = element_text(
+      angle = 90,
+      vjust = 0.5,
+      hjust = 1
+    )
+  ) +
+  labs(
+    title = "Correlation of abundances of selected phytoplankton taxa",
+    caption = paste0("Phytoplankton data gathered between ",min(year(df_trim_l_summary$sample_date))," & ", min(year(df_trim_l_summary$sample_date))),
+    x = NULL,
+    y = NULL
+  )+
+  theme(
+    plot.title = element_text(face = 2),
+    axis.text = element_text(face = 2),
+    )
+
+rm(cor_df, cor_mat, taxa_mat)
+tictoc::toc(log=TRUE)  
+
+# Plot
+df_trim_l_summary %>%
+  dplyr::mutate(taxon = stringr::str_to_camel(as.character(taxon),
+                                              first_upper = TRUE)) %>% 
+  # remove older data which is potentially more clunky(?)
+  # dplyr::filter(sample_date > "2009-12-31") %>% 
+  ggplot(.,
+         aes(
+           x = yday,
+           y = log10(abundance_m3+1),
+           group = taxon,
+         )
+  )+
+  geom_point(
+    # aes(colour = taxon),
+    alpha = 0.05)+
+  geom_smooth(
+    # aes(colour = taxon),
+    method = "gam",
+    se=FALSE)+
+  facet_wrap(.~taxon, scales = "free_y")+
+  labs(
+    title = "Abundance of selected phytoplankton taxa throughout the year",
+    caption = paste0("Phytoplankton data gathered between ",
+                     min(year(df_trim_l_summary$sample_date)),
+                     " & ", min(year(df_trim_l_summary$sample_date)),".","\n",
+                     "Note: scales on y axis are independent."),
+    x = "Day of year",
+    y = "log10(abundance per m3 +1)"
+    )+
+  theme(
+    plot.title = element_text(face = 2),
+    plot.caption = element_text(face = 2),
+    strip.text = element_text(face = 2),
+    axis.title = element_text(face = 2),
+    )
