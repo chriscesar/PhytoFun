@@ -383,19 +383,28 @@ df_trim_l %>%
                    .groups = "drop") %>% dplyr::ungroup() %>% 
   ## arrange by sample_id
   dplyr::arrange(.,sample_id) -> df_trim_l_summary
+tictoc::toc(log = TRUE)
 
-# write data
+# write data ----
+## as Rdata
+tictoc::tic("Save Rdat")
+saveRDS(df_trim_l_summary,
+        file = paste0(output.location,
+                      "trimmed_phyto_taxa_of_interest_long.Rdat")
+        )
+tictoc::toc(log = TRUE)
 
-write.csv(df_trim_l_summary,
-          file = paste0(output.location,
-                        "trimmed_phyto_taxa_of_interest_long.csv"),
-          row.names = FALSE
-          )
-
+tictoc::tic("Save csv")
+# write.csv(df_trim_l_summary,
+#           file = paste0(output.location,
+#                         "trimmed_phyto_taxa_of_interest_long.csv"),
+#           row.names = FALSE
+#           )
 tictoc::toc(log = TRUE)
 
 tictoc::tic("Produce correlation heatmap")
-# correlation heatmap ----
+# PLOTS ----
+## correlation heatmap ----
 taxa_mat <-
   df_trim_l_summary %>%
   select(sample_id, taxon, abundance_m3) %>%
@@ -480,10 +489,10 @@ ggplot(
     axis.text = element_text(face = 2),
     )
 
-rm(cor_df, cor_mat, taxa_mat)
+rm(cor_df, cor_mat)
 tictoc::toc(log=TRUE)  
 
-# Plot
+## Day of year plot ----
 df_trim_l_summary %>%
   dplyr::mutate(taxon = stringr::str_to_camel(as.character(taxon),
                                               first_upper = TRUE)) %>% 
@@ -519,3 +528,82 @@ df_trim_l_summary %>%
     strip.text = element_text(face = 2),
     axis.title = element_text(face = 2),
     )
+
+## gllvm model & plot ----
+tictoc::tic("Run gllvm")
+library(gllvm)
+## THIS VERSION DOES NOT RUN ON 650,000 observations
+### create subset
+Y <- as.matrix(taxa_mat[,-1])
+
+set.seed(1)
+
+idx <- sample(
+  seq_len(nrow(Y)),
+  size = 1000
+)
+
+Y_sub <- Y[idx, ]
+
+gllvm_fit <- gllvm::gllvm(y = Y_sub,
+                          family = "negative.binomial",
+                          trace = TRUE,
+                          num.lv = 2
+                          )
+saveRDS(
+  gllvm_fit,
+  file=paste0(
+    output.location,
+    "gllvm_phyto_abund_negbin_uncond.Rdat")
+  ) # 244.46 sec
+tictoc::toc(log = TRUE)
+
+## correlation plot
+tictoc::tic("Run corrplot")
+cr <- getResidualCor(gllvm_fit)
+
+corrplot::corrplot(cr, diag = FALSE, type = "lower", method = "square",
+                   tl.srt = 25)
+tictoc::toc(log = TRUE)
+
+## Temporal trend plots ----
+df_trim_l_summary %>%
+  # Capitalise taxon names
+  dplyr::mutate(taxon = stringr::str_to_camel(as.character(taxon),
+                                              first_upper = TRUE)) %>% 
+  # remove older data which is potentially more clunky(?)
+  # dplyr::filter(sample_date > "2009-12-31") %>% 
+  dplyr::filter(region_lab == "NW") %>% 
+  ggplot(.,
+         aes(
+           # x = yday,
+           x = sample_date,
+           y = log10(abundance_m3+1),
+           group = taxon,
+         )
+  ) +
+  geom_point(
+    # aes(colour = taxon),
+    alpha = 0.05)+
+  geom_smooth(
+    # aes(colour = taxon),
+    method = "gam",
+    # se=FALSE,
+    fill = "lightblue"
+    )+
+  facet_wrap(.~taxon, scales = "free_y")+
+  labs(
+    title = "Abundance of selected phytoplankton taxa throughout the year",
+    caption = paste0("Phytoplankton data gathered between ",
+                     min(year(df_trim_l_summary$sample_date)),
+                     " & ", min(year(df_trim_l_summary$sample_date)),".","\n",
+                     "Note: scales on y axis are independent."),
+    x = "Day of year",
+    y = "log10(abundance per m3 +1)"
+  )+
+  theme(
+    plot.title = element_text(face = 2),
+    plot.caption = element_text(face = 2),
+    strip.text = element_text(face = 2),
+    axis.title = element_text(face = 2),
+  )
