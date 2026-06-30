@@ -37,7 +37,7 @@ Incorporating phytoplankton abundances and carbon contents.
     + ~Import phytoplankton & zooplankton data which correspond to zooplankton BIOSYS sites generated in '03_JoinPhytoZoops.R'~
     + ~Generates initial plots of trends/relationships~
 
-## TO DO
+## TO DO/DONE
 
 * ~Check conversions in zooplankton and phytoplankton abundances~ **DONE**
 * ~Check 'missing' taxa for carbon values.  Can we use congeners/parent taxa values?~ **DONE**
