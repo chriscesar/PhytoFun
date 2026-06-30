@@ -4,7 +4,7 @@ Examinations of phytoplankton time series data
 Incorporating phytoplankton abundances and carbon contents.
 
 ## Workflow
-* script: '00Newsetup.R'
+~* script: '00Newsetup.R'
     + Read Phyto data since 2000 from EA BOXI extract & save as a smaller .Rdata object
 
 * script: '01_DataImportandFormat_v2.R'
@@ -35,7 +35,7 @@ Incorporating phytoplankton abundances and carbon contents.
 
 * script: '05_homogeniseUnits.R'
     + Import phytoplankton & zooplankton data which correspond to zooplankton BIOSYS sites generated in '03_JoinPhytoZoops.R'
-    + Generates initial plots of trends/relationships
+    + Generates initial plots of trends/relationships~
 
 ## TO DO
 
