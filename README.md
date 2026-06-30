@@ -39,11 +39,11 @@ Incorporating phytoplankton abundances and carbon contents.
 
 ## TO DO
 
-* ~Check conversions in zooplankton and phytoplankton abundances~
-* ~Check 'missing' taxa for carbon values.  Can we use congeners/parent taxa values?~
-* ~Update script '01_....' to incorporate amended carbon values~
-* ~Update/sense check subsequent scripts to ensure no errors~
-* ~Apparent under-estimation of phyto carbon (or OVER-estimation of zoops)~
+* ~Check conversions in zooplankton and phytoplankton abundances~**DONE**
+* ~Check 'missing' taxa for carbon values.  Can we use congeners/parent taxa values?~**DONE**
+* ~Update script '01_....' to incorporate amended carbon values~**DONE**
+* ~Update/sense check subsequent scripts to ensure no errors~**DONE**
+* ~Apparent under-estimation of phyto carbon (or OVER-estimation of zoops)~**DONE**
 * ?Clean code into a single script?
     + **DONE** Complete import and formatting of data now available in new script: *ImportPhyto_New.R*
 * Link phyto data & zoop data with WIMS data
