@@ -81,7 +81,7 @@ aphia_ids <- map_dfr(unique_names, function(taxon) {
     )
   })
 
-aphia_ids |> rename("taxa_name" = "name") ->aphia_ids
+aphia_ids |> rename("taxa_name" = "name") -> aphia_ids
 tictoc::toc(log=TRUE)
 
 ## Generate Worms records ----
@@ -429,6 +429,7 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
   dplyr::select(
     pot_number,
     sample_date,
+    site_name,
     biosys_short,
     data_set,
     aphia_id,
@@ -490,6 +491,7 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     eastings,
     northings,
     biosys_short,
+    site_name,
     sample_date,
     data_set,
     aphia_id,
@@ -527,6 +529,7 @@ df_phyto %>% #names()
   sample_id,
   sample_date,
   biosys_code_short,
+  site_station_name,
   data_set,
   aphia_id,
   taxa_name,
@@ -553,6 +556,7 @@ df_phyto %>% #names()
   dplyr::rename(
     region = river_basi,
     wb = wb_name,
+    site_name = site_station_name,
     biosys_short = biosys_code_short,
     carb_tot_units = c_total_sample_units,
     mn_carb_ind = c_per_ind_mean,
@@ -570,6 +574,7 @@ df_phyto %>% #names()
     sample_id,region,wb_id,wb,
     eastings,
     northings,biosys_short,
+    site_name,
     sample_date,
     data_set,
     aphia_id,
@@ -915,13 +920,13 @@ write.csv(
   row.names = FALSE
   )
 
-tictock::toc(log=TRUE)
+tictoc::toc(log=TRUE)
 
 unlist(tictoc::tic.log())
 
 # Tidy up ####
 rm(list = ls(pattern = "^df"))
-rm(ppi,GISfol,theme_use,unique_names,zoopfol)
+rm(ppi,GISfol,theme_use,unique_names,zoopfol,output)
 
 detach("package:tidyverse", unload=TRUE)
 detach("package:tidyr", unload=TRUE)
