@@ -92,12 +92,16 @@ toc()
 # calculate number of samples, first date & last date for monitoring
 tic("summarise site data")
 wimsdat %>% 
+  # identify distinct sampling events
+  dplyr::select(notation,DATE_TIME) %>% distinct() %>% 
   dplyr::group_by(notation) %>% 
   dplyr::summarise(
     min_date = min(DATE_TIME),
     max_date = max(DATE_TIME),
-    n = n()
+    n = n(),
+    .groups = "drop"
   ) %>% 
+  
   left_join(
     ., dfwimsSites %>% dplyr::select(
       notation,SMPT_SHORT_NAME,Easting,
@@ -121,6 +125,7 @@ toc()
 
 site_ranges <- readRDS("outputs/site_dates.Rdat")
 
+# PLOTS ----
 # Decade boundaries
 decade_lines <- seq(
   as.Date("1980-01-01"),
@@ -133,7 +138,8 @@ decade_lines <- seq(
 fiveyear_lines <- seq(
   as.Date("1985-01-01"),
   as.Date("2025-01-01"),
-  by = "10 years")
+  by = "10 years"
+  )
 
 
 site_ranges %>% 
@@ -163,8 +169,26 @@ site_ranges %>%
     "North West",
     "Solway Tweed"
   ))) %>% 
+  # ## remove under-sampled sites
+  # dplyr::filter(n > 12) %>%
+  
+  # scale number of samples within each region
+  dplyr::group_by(RBD) %>%
+  dplyr::mutate(
+    scaled_n = scales::rescale(n, to = c(1, 10))
+  ) %>%
+  dplyr::ungroup() %>%
+  dplyr::relocate(scaled_n, .after = n) %>%
+  
+  # create ordered factor for site names
+  # mutate(notation = forcats::fct_reorder(notation, -scaled_n)) %>%
+  
   ggplot(.,
-       aes(y = notation)) +
+       aes(
+         y = notation
+         )
+       ) +
+  
   geom_segment(
     aes(x = min_date, xend = max_date, yend = notation,
         col = status,
@@ -176,21 +200,21 @@ site_ranges %>%
              colour = "grey40",
              linewidth = 0.6,
              linetype = 2
-  ) +
+             ) +
   geom_vline(xintercept = fiveyear_lines,
              colour = "grey70",
              linewidth = 0.4,
              linetype = 3
-  ) +
-  # geom_point(aes(x = min_date,
-  #                fill = status
-  #                ), size = 3,pch=21,
-  #            alpha = 0.4
-  #            ) +
+             ) +
   geom_point(aes(x = max_date,
-                 fill = status
-                 ), size = 3,pch=21,
-             alpha = 0.4
+                 fill = status,
+                 size = scaled_n,
+                 alpha = scaled_n,
+                 ),
+             # size = 3,
+             pch=21,
+             # alpha = 0.4,
+             show.legend = c(size = FALSE)
              ) +
   scale_fill_manual(values = c("Open" = "azure2","Closed" = "coral1"))+
   scale_colour_manual(values = c("Open" = "deepskyblue2","Closed" = "coral1"))+
@@ -203,14 +227,15 @@ site_ranges %>%
   labs(
     title = "Timescale over which individual EA WIMS sampling sites in estuarine and coastal waters have been monitored",
     subtitle = "Points indicate most recent sampling event, with tails indicating timescale over which monitoring has occurred.
-Shading indicates whether a sample is currently flagged as 'Open' or 'Closed'",
-    caption = "Each line/point item represents a separate sampling station as defined by WIMS SAMP_SMPT_USER_REFERENCE values"
+Shading indicates whether a sample is currently flagged as 'Open' or 'Closed'.",
+    caption = "Each line/point item represents a separate sampling station as defined by SAMP_SMPT_USER_REFERENCE values in WIMS.
+Within each RBD, the size and opacity of each point is scaled by the number of individual sampling events for a given station. Comparisons of point sizes cannot be reliably made between RBD facets."
   ) +
   theme(
     strip.text = element_text(face = 2, size=14),
     plot.title = element_text(face = 2),
     plot.subtitle = element_text(face = 2),
-    plot.caption = element_text(face = 2, size = 11, lineheight = 0.5),
+    plot.caption = element_text(face = 2, size = 11, lineheight = 0.75),
     axis.title.x = element_text(face = 2, size=12),
     axis.title.y = element_blank(),
     axis.text.x = element_text(face = 2),
