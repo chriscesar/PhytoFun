@@ -36,7 +36,6 @@ df$wims <- df$wims %>%
   dplyr::left_join(., wb_inf,by = "wb_id") %>% 
   dplyr::relocate(wb, .after = wb_id)
 
-
 summary(nchar(df0$wims$code))
 
 names(df$meta)
@@ -223,6 +222,10 @@ rgn_df_clean <- rgn_df %>%
 wb_lookup <- rgn_df_clean %>%
   dplyr::distinct(region, wb)
 
+# Try to group by Region
+wb_lookup_region <- wb_lookup %>% dplyr::distinct(region) %>% 
+  dplyr::mutate(wb = paste0(region," - All"))
+
 ## Output folder ----
 
 outdir <- "outputs/PCA_plots"
@@ -242,7 +245,7 @@ make_pca_plot <- function(wb_use, region_use, dat, n = 3) {
       .groups = "drop"
     ) %>%
     # remove variable "NA"
-    dplyr::select(-`NA`) %>%
+    dplyr::select(-dplyr::any_of("NA")) %>%
     dplyr::select(-wb)
   
   # Need enough years for PCA
@@ -274,6 +277,7 @@ make_pca_plot <- function(wb_use, region_use, dat, n = 3) {
   #--------------------------------------------------
   
   pca_data <- rgn_mean %>%
+    dplyr::select(-dplyr::any_of(exclude_taxa)) %>%
     dplyr::filter(keep_rows) %>%
     dplyr::select(-year) %>%
     
@@ -349,9 +353,16 @@ make_pca_plot <- function(wb_use, region_use, dat, n = 3) {
     return(NULL)
   }
   
+  # scores <- as.data.frame(pca$x) %>%
+  #   dplyr::mutate(year = years) %>%
+  #   dplyr::arrange(year)
   scores <- as.data.frame(pca$x) %>%
     dplyr::mutate(year = years) %>%
-    dplyr::arrange(year)
+    dplyr::arrange(year) %>%
+    dplyr::mutate(
+      PC1_next = dplyr::lead(PC1),
+      PC2_next = dplyr::lead(PC2)
+    )
   
   loadings <- as.data.frame(pca$rotation) %>%
     tibble::rownames_to_column("taxon")
@@ -364,11 +375,26 @@ make_pca_plot <- function(wb_use, region_use, dat, n = 3) {
     scores,
     ggplot2::aes(PC1, PC2)
   ) +
-    ggplot2::geom_path(
-      ggplot2::aes(colour = year),
+    # ggplot2::geom_path(
+    #   ggplot2::aes(colour = year),
+    #   linewidth = 1.2,
+    #   arrow = grid::arrow(length = unit(0.15, "cm"))
+    # ) +
+    ggplot2::geom_segment(
+      data = dplyr::filter(scores, !is.na(PC1_next)),
+      ggplot2::aes(
+        x = PC1,
+        y = PC2,
+        xend = PC1_next,
+        yend = PC2_next,
+        colour = year
+      ),
       linewidth = 1.2,
-      arrow = grid::arrow(length = unit(0.15, "cm"))
-    ) +
+      arrow = grid::arrow(
+        length = unit(0.2, "cm"),
+        type = "open"
+      )
+    )+
     ggplot2::geom_point(
       ggplot2::aes(colour = year),
       size = 4
@@ -412,7 +438,8 @@ make_pca_plot <- function(wb_use, region_use, dat, n = 3) {
       ),
       caption = paste0("Principal components analysis of Hellinger-transformed annual mean abundances of phytoplankton groups.\n",
                        "Taxa appearing in ",n," or fewer samples excluded.\n",
-                       "Dashed lines indicate PCA loadings. Coloured lines and points show trends over time.")
+                       "Dashed lines indicate PCA loadings. Coloured lines and points show trends over time.\n",
+                       "Excluded taxa (if any): ",paste(exclude_taxa, collapse = ", "),".")
     ) +
     ggplot2::theme_bw() +
     ggplot2::theme(
@@ -428,6 +455,9 @@ safe_make_pca_plot <- purrr::possibly(
   otherwise = NULL
 )
 
+# exclude_taxa <- c()
+exclude_taxa <- c("NA", "Protozoa")
+
 purrr::pwalk(
   wb_lookup,
   function(region, wb) {
@@ -446,7 +476,8 @@ purrr::pwalk(
         gsub("[^A-Za-z0-9_]", "_", region),
         "_",
         gsub("[^A-Za-z0-9_]", "_", wb),
-        "_PCA.png"
+        # "_PCA.png"
+        "_PCA_no_NAProt.png"
       )
       
       ggplot2::ggsave(
@@ -459,12 +490,16 @@ purrr::pwalk(
       
       message("Saved: ", fname)
     }
-  }
-)
+    }
+  )
 
 
 ## Loop through all waterbodies ----
 tictoc::tic("Generate individual plots")
+# remove NA & Protozoa
+# exclude_taxa <- c()
+exclude_taxa <- c("NA", "Protozoa")
+
 purrr::pwalk(
   wb_lookup,
   function(region, wb) {
@@ -483,7 +518,8 @@ purrr::pwalk(
         gsub("[^A-Za-z0-9_]", "_", region),
         "_",
         gsub("[^A-Za-z0-9_]", "_", wb),
-        "_PCA.png"
+        # "_PCA.png"
+        "_PCA_no_NAProt.png"
       )
       
       ggplot2::ggsave(
