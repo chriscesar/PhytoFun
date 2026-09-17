@@ -66,6 +66,9 @@ dfsmps_out <- dfsmps %>%
   mutate(coords = map(ngr, ngr_to_en)) %>%
   unnest(coords)
 tictoc::toc(log=TRUE)
+write.csv(dfsmps_out, file="outputs/Phytoplankton_unique_sites.csv",
+          row.names = FALSE)
+rm(dfsmps,dfsmps_out)
 
 # 00200 Format names & add carbon values ----
 
