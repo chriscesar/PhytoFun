@@ -3,7 +3,7 @@
 ## Rebooted code to import and prep raw phytoplankton data from
 ## BIOSYS extract.  Replaces older versions
 ## DATE: 03/06/2026
-## DATE Last Updated: 18/06/2026
+## DATE Last Updated: 17/09/2026
 ## AUTHOR: Dr Christopher Cesar
 ## EDITORS:
 
@@ -15,6 +15,8 @@ rm(ld_pkgs)
 tictoc::tic.clearlog() ##clear log
 
 source("R/000setup.R")
+source("R/helperFunctions.R")
+
 # remove unnecessary items from setup code
 rm(list = ls(pattern = "^cb"));rm(ppi,theme_use)
 
@@ -43,6 +45,26 @@ rm(list = ls(pattern = "^cb"));rm(ppi,theme_use)
 tictoc::tic("Load data")
 # Load raw data from Rdat file (quicker processing) ----
 df_phyto0 <- readRDS(file = "outputs/Phyto_raw_extract.Rdat")
+tictoc::toc(log=TRUE)
+
+tictoc::tic("ID & export sample sites")
+# ID & export sample sites ----
+df_phyto0 %>%
+  dplyr::select(site_station_name:analysis_amended_date) %>%
+  dplyr::select(-c(
+    taxa_name, cells_per_litre_millilitre,
+    colonies_per_litre_millilitre,
+    settling_time,taxon_qualifier)
+    ) %>%
+  dplyr::select(
+    site_station_name, site_id, ngr, region, area, water_body,
+    water_body_type, wfd_waterbody_id, catchment
+    ) %>%
+  distinct() -> dfsmps
+
+dfsmps_out <- dfsmps %>%
+  mutate(coords = map(ngr, ngr_to_en)) %>%
+  unnest(coords)
 tictoc::toc(log=TRUE)
 
 # 00200 Format names & add carbon values ----
@@ -415,7 +437,7 @@ df_zoop <- read.csv((paste0(zoopfol,"processedData/zoopsAll.csv"))) %>%
 df_zoop$data_set <- "Zooplankton"
 
 zoop_meta <- readxl::read_xlsx(paste0(zoopfol,
-                                      "processedData/260608_MBA_Returns_Amalgamated_USE.xlsx"),
+                                      "processedData/260728_MBA_Returns_Amalgamated_USE.xlsx"),
                                sheet = "SiteMeta") %>% 
   dplyr::select(-Region...8) %>% 
   dplyr::rename(Region = Region...11) %>% 
@@ -437,6 +459,7 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     region,
     wbid,
     wb,
+    category,
     eastings,
     northings,
     lf02,
@@ -468,7 +491,9 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
   #rename for consistency
   dplyr::rename(
     sample_id = pot_number,
-    wb_id = wbid,taxon = taxa,
+    wb_id = wbid,
+    wb_type = category,
+    taxon = taxa,
     lifeform = lf02,
     abundance = abund_m3,
     abundance_units = abund_m3_units,
@@ -488,6 +513,7 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     region,
     wb_id,
     wb,
+    wb_type,
     eastings,
     northings,
     biosys_short,
@@ -536,6 +562,7 @@ df_phyto %>% #names()
   river_basi,
   wb_id,
   wb_name,
+  wb_type,
   eastings,
   northings,
   phyto_lf,
@@ -571,7 +598,7 @@ df_phyto %>% #names()
     ) %>%
   ## reorder columns to match
   dplyr::select(
-    sample_id,region,wb_id,wb,
+    sample_id,region,wb_id,wb,wb_type,
     eastings,
     northings,biosys_short,
     site_name,
@@ -926,7 +953,7 @@ unlist(tictoc::tic.log())
 
 # Tidy up ####
 rm(list = ls(pattern = "^df"))
-rm(ppi,GISfol,theme_use,unique_names,zoopfol,output)
+rm(ppi,GISfol,theme_use,unique_names,zoopfol,output,lf_tmp,wims_cache,wims_meta_fol)
 
 detach("package:tidyverse", unload=TRUE)
 detach("package:tidyr", unload=TRUE)
