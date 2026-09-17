@@ -61,14 +61,14 @@ ppi <- 300 #figure resolution
 
 # Plot themes ####
 ggplot2::theme_set(ggthemes::theme_few())
-theme_use <- theme(
-  strip.text = element_text(face = 2),
-  axis.title.x = element_blank(),
-  axis.title.y = element_text(face=2),
-  axis.text = element_text(face=2),
-  axis.text.x = element_text(size = 12),
+theme_use <- ggplot2::theme(
+  strip.text = ggplot2::element_text(face = 2),
+  axis.title.x = ggplot2::element_blank(),
+  axis.title.y = ggplot2::element_text(face=2),
+  axis.text = ggplot2::element_text(face=2),
+  axis.text.x = ggplot2::element_text(size = 12),
   plot.caption = ggtext::element_markdown(face=2,size=12),
-  plot.title = element_text(face=2,size = 14),
+  plot.title = ggplot2::element_text(face=2,size = 14),
   
 )
 
