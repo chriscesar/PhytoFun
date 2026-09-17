@@ -159,3 +159,44 @@ convert_multiple_osgb <- function(grid_refs) {
   return(result)
 }
 
+
+library(dplyr)
+library(tidyr)
+library(stringr)
+library(purrr)
+
+ngr_to_en <- function(ngr) {
+  
+  ngr <- toupper(gsub("\\s+", "", ngr))
+  
+  l1 <- substr(ngr, 1, 1)
+  l2 <- substr(ngr, 2, 2)
+  
+  letters <- c(
+    "A","B","C","D","E",
+    "F","G","H","J","K",
+    "L","M","N","O","P",
+    "Q","R","S","T","U",
+    "V","W","X","Y","Z"
+  )
+  
+  n1 <- match(l1, letters) - 1
+  n2 <- match(l2, letters) - 1
+  
+  e100km <- ((n1 %% 5) * 5 + (n2 %% 5)) * 100000 - 1000000
+  n100km <- (19 - (n1 %/% 5) * 5 - (n2 %/% 5)) * 100000
+  
+  digits <- substr(ngr, 3, nchar(ngr))
+  ndig <- nchar(digits) / 2
+  
+  e <- as.numeric(substr(digits, 1, ndig))
+  n <- as.numeric(substr(digits, ndig + 1, ndig * 2))
+  
+  scale <- 10^(5 - ndig)
+  
+  tibble(
+    easting = e100km + e * scale,
+    northing = n100km + n * scale
+  )
+}
+
