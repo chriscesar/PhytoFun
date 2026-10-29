@@ -8,7 +8,8 @@
 ## EDITORS:
 
 # load packages & set meta ----
-ld_pkgs <- c("tidyverse","tictoc", "worrms","purrr")
+ld_pkgs <- c("tidyverse","tictoc", "worrms","purrr","osgridref",
+             "data.table","parallel")
 vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
@@ -20,26 +21,54 @@ source("R/helperFunctions.R")
 # remove unnecessary items from setup code
 rm(list = ls(pattern = "^cb"));rm(ppi,theme_use)
 
-# 00100 Import data extracted from BIOSYS using BOXI query ----
+# # 00100 Import data extracted from BIOSYS using BOXI query ----
 # tic("DATA IMPORT: Downloading, importing & loading data")
-# ## Takes time. Only needs running when data are updated
-# ## Can be commented out
-# df_phyto0 <- readxl::read_excel("data/Phyto_2000_2026.xlsx",
-#                                 sheet = "PhyoData",
-#                                 col_types = c(
-#                                   "text", "text", "text", "text",
-#                                   "text", "text", "date", "text",
-#                                   "text", "text", "numeric", "text",
-#                                   "text", "text", "numeric", "text",
-#                                   "text", "text", "text", "text",
-#                                   "text", "text", "text", "text", "text",
-#                                   "text", "text", "text", "date",
-#                                   "text", "date", "text", "text",
-#                                   "text", "text", "text", "text",
-#                                   "text", "text", "numeric", "numeric"
-#                                   ))
-# saveRDS(janitor::clean_names(df_phyto0),
+# # ## Takes time. Only needs running when data are updated
+# 
+# # ## Can be commented out
+# # BIOSYS data extracted in chunks using the BOXI query:
+# # 5a New_Biosys_Marine phytoplankton analysis_by waterbody_by year_additional methods_and_time_analysis date_analysis_lab
+# # Get file names:
+# csv_files <- list.files(
+#   path = "data/Biosys/",
+#   pattern = "\\.csv$",
+#   full.names = TRUE
+#   )
+# 
+# df_phyto0 <- rbindlist(
+#   lapply(csv_files, fread),
+#   use.names = FALSE
+#   ) %>%
+#   janitor::clean_names() %>% 
+#   dplyr::as_tibble()
+# 
+# df_phyto0 <- df_phyto0 %>%
+#   dplyr::mutate(
+#     sample_date = lubridate::as_date(lubridate::ymd_hms(sample_date)),
+#     date_of_analysis = lubridate::as_date(lubridate::ymd_hms(date_of_analysis)),
+#     analysis_amended_date = lubridate::as_date(lubridate::ymd_hms(analysis_amended_date))
+#   )
+# 
+# ## tidy up NGR values
+# df_phyto0 %>% 
+#   dplyr::mutate(ngr = case_when(
+#     ngr != "" ~ ngr,
+#     ngr == "" ~ sample_ngr,
+#     TRUE ~ NA_character_
+#   )) %>% 
+#   ## remove samples without grid ref
+#   dplyr::filter(
+#     ngr != ""
+#     ) -> df_phyto0
+# 
+# ## save unedited version ----
+# ### RDat
+# saveRDS(df_phyto0,
 #         file = "outputs/Phyto_raw_extract.Rdat")
+# ### csv
+# write.csv(df_phyto0,
+#         file = "outputs/Phyto_raw_extract.csv",row.names = FALSE)
+# 
 # toc(log=TRUE)
 
 tictoc::tic("Load data")
@@ -47,28 +76,114 @@ tictoc::tic("Load data")
 df_phyto0 <- readRDS(file = "outputs/Phyto_raw_extract.Rdat")
 tictoc::toc(log=TRUE)
 
-tictoc::tic("ID & export sample sites")
-# ID & export sample sites ----
-df_phyto0 %>%
-  dplyr::select(site_station_name:analysis_amended_date) %>%
-  dplyr::select(-c(
-    taxa_name, cells_per_litre_millilitre,
-    colonies_per_litre_millilitre,
-    settling_time,taxon_qualifier)
-    ) %>%
-  dplyr::select(
-    site_station_name, site_id, ngr, region, area, water_body,
-    water_body_type, wfd_waterbody_id, catchment
-    ) %>%
-  distinct() -> dfsmps
+# # Extract sites & grid refs ----
+# tictoc::tic("Extract sites & grid refs")
+# df_phyto0 %>%
+#   dplyr::select(
+#     site_station_name,
+#     site_id,
+#     ngr,
+#     region,
+#     area,
+#     water_body,
+#     water_body_type,
+#     wfd_waterbody_id,
+#     catchment
+#     ) %>%
+#   dplyr::count(
+#     site_station_name,
+#     site_id,
+#     ngr,
+#     region,
+#     area,
+#     water_body,
+#     water_body_type,
+#     wfd_waterbody_id,
+#     catchment,
+#     name = "n_records"
+#   ) -> sites
+# 
+# ## install osgrodref package from github ---
+# # devtools::install_github("matthewjwhittle/osgridref")
+# xy <- osgridref::gridref_to_xy(sites$ngr)
+# sites <- sites %>%
+#   mutate(
+#     easting = xy$x,
+#     northing = xy$y
+#   )
+# 
+# write.csv(sites,
+#           file = "outputs/BIOSYS_sites.csv",row.names = FALSE)
+# toc(log=TRUE)
 
-dfsmps_out <- dfsmps %>%
-  mutate(coords = map(ngr, ngr_to_en)) %>%
-  unnest(coords)
-tictoc::toc(log=TRUE)
-write.csv(dfsmps_out, file="outputs/Phytoplankton_unique_sites.csv",
-          row.names = FALSE)
-rm(dfsmps,dfsmps_out)
+tictoc::tic("Load WB look-up")
+# Load WB look-up ####
+sites_wb <- readxl::read_excel(
+  path = "outputs/BIOSYS_sites_Joined.xlsx",
+  sheet = "BIOSYS_sites_use"
+  ) %>% 
+  dplyr::distinct()
+
+## ensure  site ids are unique
+print(
+  if (sites_wb %>%
+      dplyr::count(site_id) %>%
+      dplyr::filter(n > 1) %>%
+      nrow() == 0) {
+    "SITE CHECK: All site_id values are unique. Continue."
+    } else {
+      "SITE CHECK: WARNING - duplicate site_id values detected. Action needed."
+      }
+  )
+
+toc(log=TRUE)
+
+# Bind WBs to phyto data ----
+tictoc::tic("Bind WBs to phyto data")
+df_phyto0 %>% 
+  # left join
+  dplyr::left_join(., sites_wb, by = "site_id") -> df_phyto0
+rm(sites_wb)
+toc(log=TRUE)
+
+# Generate Eastings & Northings from NGR ----
+tictoc::tic("Generate Eastings & Northings from NGR")
+EN_tmp <- dplyr::as_tibble(
+  osgridref::gridref_to_xy(df_phyto0$ngr) %>% 
+    dplyr::select(-resolution)
+  )
+
+df_phyto0 <- cbind(df_phyto0,EN_tmp)
+df_phyto0 <- df_phyto0 %>%
+  dplyr::relocate(x,y, .after = ngr) %>% 
+  rename(
+    eastings = x,
+    northings = y
+         )
+toc(log=TRUE)
+
+# tictoc::tic("ID & export sample sites")
+# # ID & export sample sites ----
+# df_phyto0 %>%
+#   # dplyr::select(site_station_name:analysis_amended_date) %>%
+#   dplyr::select(-c(
+#     taxa_name, cells_per_litre_millilitre,
+#     colonies_per_litre_millilitre,
+#     settling_time,taxon_qualifier)
+#     ) %>%
+#   dplyr::select(
+#     site_station_name, site_id, ngr, region, area, water_body,
+#     water_body_type, wfd_waterbody_id, catchment
+#     ) %>%
+#   distinct() -> dfsmps
+# 
+# dfsmps_out <- dfsmps %>%
+#   mutate(coords = map(ngr, ngr_to_en)) %>%
+#   unnest(coords)
+# tictoc::toc(log=TRUE)
+# write.csv(dfsmps_out, file="outputs/Phytoplankton_unique_sites.csv",
+#           row.names = FALSE)
+# rm(dfsmps,dfsmps_out)
 
 # 00200 Format names & add carbon values ----
 
@@ -143,10 +258,10 @@ build_classification_wide <- function(aphia_vec,
   }
 
 # Remove rows with NA aphia_id
-aphia_ids_non_na <- aphia_ids |> filter(!is.na(aphia_id))
+aphia_ids_non_na <- aphia_ids %>% filter(!is.na(aphia_id))
 
-# For each aphia_id, retrieve record details
-# record_info <- aphia_ids_non_na |> 
+# # For each aphia_id, retrieve record details
+# record_info <- aphia_ids_non_na |>
 #   mutate(
 #     wm_data = map(aphia_id, ~ tryCatch(wm_classification(.x),
 #                                        error = function(e) NULL))
@@ -154,15 +269,15 @@ aphia_ids_non_na <- aphia_ids |> filter(!is.na(aphia_id))
 #   unnest_wider(wm_data)
 
 # # For each aphia_id, retrieve record details
-# record_info <- build_classification_wide(
-#   aphia_ids_non_na$aphia_id,
-#   id_col_name = "aphia_id"
-# )
-# 
-# record_info <- left_join(aphia_ids,record_info, by = "aphia_id")
-# 
-# write.csv(record_info,
-#           file="outputs/record_info1_non_na.csv",row.names = FALSE)
+record_info <- build_classification_wide(
+  aphia_ids_non_na$aphia_id,
+  id_col_name = "aphia_id"
+  )
+
+record_info <- left_join(aphia_ids,record_info, by = "aphia_id")
+
+write.csv(record_info,
+          file="outputs/record_info1_non_na.csv",row.names = FALSE)
 tictoc::toc(log=TRUE)
 
 ## Fill in missing Aphia IDs ----
@@ -188,10 +303,10 @@ record_info <- left_join(aphia_all,record_info, by = "aphia_id")
 write.csv(record_info, "outputs/phyto_taxon_info.csv",row.names = FALSE)
 
 ## sanity check: are all names in our phyto data in the record_info object?
-print("####################################################"); print("Do all names in phyto data match?"); print(paste0("######    ",table(df_phyto0$taxa_name %in% record_info$taxa_name)," of ",nrow(df_phyto0)));print("####################################################")
+print("####################################################"); print("######    Do all names in phyto data match?"); print(paste0("######    ",table(df_phyto0$taxa_name %in% record_info$taxa_name), "  (",table(df_phyto0$taxa_name %in% record_info$taxa_name)/nrow(df_phyto0)*100,"%) do"));print("####################################################")
 
 ### Quick tidy
-rm(aphia_all,aphia_ids,aphia_ids_na,aphia_ids_non_na)
+rm(aphia_all,aphia_ids,aphia_ids_na,aphia_ids_non_na,EN_tmp)
 rm(build_classification_wide)
 tictoc::toc(log = TRUE)
 
@@ -202,26 +317,116 @@ dfcarb_summary <- readxl::read_xlsx("data/PhytoCarbon_blankFill.xlsx",
   # remove NA values and convert to numeric for joining
   dplyr::filter(valid_aphia_id != "NA") %>% 
   dplyr::mutate(aphia_id = as.numeric(valid_aphia_id)) %>% 
-  dplyr::select(-valid_aphia_id)
+  dplyr::select(-valid_aphia_id) %>% 
+  janitor::clean_names()
 
 aphia_carb <- dplyr::left_join(record_info,
                  dfcarb_summary,
                  by = "aphia_id"
-                 )
+                 ) %>% 
+  janitor::clean_names(.)
+
+# # append taxonomy & carbon data to phyto sample data
+# df_phyto0 %>% 
+#   left_join(.,aphia_carb, by = "taxa_name") %>% 
+#   janitor::clean_names(.) %>% #glimpse()
+#   dplyr::select(-c(
+#     "...2",region,area,water_body,water_body_type,
+#     catchment,wfd_waterbody_id,analysis_amended_by,
+#     analysis_amended_date
+#     )) %>%
+#     # reorder columns
+#   relocate(river_basi,wb_id,wb_name,wb_type,wb_hm_designation,
+#              wb_typology,surveillan,
+#              distance_to_wb,eastings,northings) %>% 
+#   relocate(
+#     parent_name_usage_id,
+#     aphia_id,
+#     kingdom,
+#     subkingdom,
+#     infrakingdom,
+#     phylum,
+#     phylum_division,
+#     subphylum,
+#     subphylum_subdivision,
+#     infraphylum,
+#     parvphylum,
+#     gigaclass,
+#     superclass,
+#     class,
+#     subclass,
+#     infraclass,
+#     subterclass,
+#     superorder,
+#     order,
+#     suborder,
+#     superfamily,
+#     family,
+#     subfamily,
+#     genus,
+#     subgenus,
+#     species,
+#     forma,
+#     variety,
+#     taxa_name,
+#     taxon_qualifier,
+#     cells_per_litre_millilitre,
+#     colonies_per_litre_millilitre,
+#     mean_vol_per_cell_um3_use,
+#     median_vol_per_cell_um3_use,
+#     mean_c_per_cell_pg_c_use,
+#     median_c_per_cell_pg_c_use,
+#     carbon_value_match,
+#     .after=last_col()
+#   ) %>% 
+#   dplyr::mutate(data_set = "Phytoplankton")-> df_phyto
 
 # append taxonomy & carbon data to phyto sample data
-df_phyto0 %>% 
-  left_join(.,aphia_carb, by = "taxa_name") %>%# View()
-  dplyr::select(-c(
-    "...2",region,area,water_body,water_body_type,
-    catchment,wfd_waterbody_id,analysis_amended_by,
-    analysis_amended_date
-    )) %>% 
-  janitor::clean_names(.) %>% 
-  # reorder columns
-  relocate(river_basi,wb_id,wb_name,wb_type,wb_hm_designation,
-             wb_typology,surveillan,
-             distance_to_wb,eastings,northings) %>% 
+df_phyto <- df_phyto0 %>% 
+  
+  left_join(
+    aphia_carb,
+    by = "taxa_name"
+  ) %>% 
+  
+  janitor::clean_names() %>%
+  
+  # remove fields no longer required
+  dplyr::select(
+    -any_of(c(
+      "x2",
+      "region",
+      "area",
+      "water_body",
+      "water_body_type",
+      "catchment",
+      "wfd_waterbody_id",
+      "analysis_amended_by",
+      "analysis_amended_date"
+    ))
+  ) %>%
+  
+  # reorder water-body / spatial classification columns
+  relocate(
+    river_basin_district,
+    wb_id,
+    wb_name,
+    water_body_type_2,
+    water_body_hmd,
+    water_body_typology,
+    operational_catchment,
+    opcat_id,
+    operational_catchment_alt,
+    management_catchment,
+    mancat_id,
+    management_catchment_alt,
+    ea_area_name,
+    rbd_id,
+    country,
+    distance_m
+  ) %>%
+  
+  # move taxonomy, abundance and carbon fields to the end
   relocate(
     parent_name_usage_id,
     aphia_id,
@@ -260,17 +465,24 @@ df_phyto0 %>%
     mean_c_per_cell_pg_c_use,
     median_c_per_cell_pg_c_use,
     carbon_value_match,
-    .after=last_col()
-  ) %>% 
-  dplyr::mutate(data_set = "Phytoplankton")-> df_phyto
+    .after = last_col()
+  ) %>%
+  
+  dplyr::mutate(
+    data_set = "Phytoplankton"
+  )
 
 ## tidy up
-rm(df_phyto0, aphia_carb,dfcarb_summary,record_info)
+rm(
+  df_phyto0,
+  aphia_carb,
+  dfcarb_summary,
+  record_info
+  )
 tictoc::toc(log=TRUE)
 
 tictoc::tic("extract Biosys code from site_station_name")
 ## extract BIOSYS codes from site_station_name
-# extract Biosys code from site_station_name ###
 site_station_name <- unique(df_phyto$site_station_name)
 
 df_phyto %>% dplyr::select(site_station_name,site_id) %>% 
@@ -285,7 +497,7 @@ df_phyto %>% dplyr::select(site_station_name,site_id) %>%
     NA_character_,
     substr(biosys_code, 1, nchar(biosys_code) - 1)
   )
-  ) ->biosys_wip
+  ) -> biosys_wip
 
 # regular expression to extract sections of text with:
 # [A-Z]{3} EXACTLY 3 upper case letters (e.g. 'SOL'), followed by
@@ -296,7 +508,8 @@ df_phyto %>% dplyr::select(site_station_name,site_id) %>%
 df_phyto %>% 
   dplyr::mutate(tmp = paste0(site_station_name,
                              site_id)) %>% 
-  left_join(., biosys_wip, by="tmp") %>%
+  left_join(., biosys_wip,
+            by="tmp") %>%
   relocate(biosys_code,biosys_code_short, .after = site_id) %>% 
   dplyr::select(-tmp) -> df_phyto
 
@@ -304,6 +517,8 @@ rm(biosys_wip, site_station_name)
 tictoc::toc(log=TRUE)
 
 tictoc::tic("Append lifeforms")
+df_phyto0 <- df_phyto #keep backup for audit
+
 # 00300 Append life form data ----
 lf_tmp <- readxl::read_xlsx("data/Masterlist-V7_working_EDIT_CC.xlsx",
                             sheet = "SpeciesInfoUSE") %>% 
@@ -323,7 +538,7 @@ df_phyto %>%
   left_join(.,lf_tmp, by = "aphia_id") -> df_phyto
 
 df_phyto <- janitor::clean_names(df_phyto)
-rm(lf_tmp)
+rm(lf_tmp, df_phyto0)
 tictoc::toc(log = TRUE)
 
 ## 00310 Explicitly state units used ----
@@ -440,11 +655,19 @@ df_zoop <- read.csv((paste0(zoopfol,"processedData/zoopsAll.csv"))) %>%
 df_zoop$data_set <- "Zooplankton"
 
 zoop_meta <- readxl::read_xlsx(paste0(zoopfol,
-                                      "processedData/260728_MBA_Returns_Amalgamated_USE.xlsx"),
+                                      "processedData/261009_MBA_Returns_Amalgamated_USE.xlsx"),
                                sheet = "SiteMeta") %>% 
   dplyr::select(-Region...8) %>% 
   dplyr::rename(Region = Region...11) %>% 
   janitor::clean_names(.)
+
+df_zoop0 <- df_zoop
+
+df_zoop <- dplyr::left_join(
+  df_zoop %>% dplyr::select(-c(region,wbid)),
+  zoop_meta,
+  by=c("wims_code"="wims")
+  )
 
 ## homogenise variable names ----
 ### Zoops ----
@@ -459,12 +682,24 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
     data_set,
     aphia_id,
     taxa,
-    region,
+    # region,
     wbid,
     wb,
     category,
     eastings,
     northings,
+    water_body_hmd,
+    water_body_typology,
+    operational_catchment,
+    opcat_id,
+    operational_catchment_alt,
+    management_catchment,
+    mancat_id,
+    management_catchment_alt,
+    ea_area_name,
+    river_basin_district,
+    rbd_id,
+    country,
     lf02,
     kingdom:display_name,
     abund_m3,mn_carb_tot_m3_ug,
@@ -513,10 +748,24 @@ zooptrm <- df_zoop %>% dplyr::as_tibble() %>%
   ## reorder columns to match
   dplyr::select(
     sample_id,
-    region,
+    # region,
     wb_id,
     wb,
     wb_type,
+    ##
+    water_body_hmd,
+    water_body_typology,
+    operational_catchment,
+    opcat_id,
+    operational_catchment_alt,
+    management_catchment,
+    mancat_id,
+    management_catchment_alt,
+    ea_area_name,
+    river_basin_district,
+    rbd_id,
+    country,
+    ##
     eastings,
     northings,
     biosys_short,
@@ -554,6 +803,7 @@ tictoc::tic("Format phyto data")
 ## Prep phyto data ####
 # retain 'sensible' variables
 df_phyto %>% #names()
+  dplyr::rename(wb_type = water_body_type_2) %>% 
   dplyr::select(
   sample_id,
   sample_date,
@@ -562,10 +812,25 @@ df_phyto %>% #names()
   data_set,
   aphia_id,
   taxa_name,
-  river_basi,
+  # river_basi,
+  # river_basin_district,
   wb_id,
   wb_name,
   wb_type,
+  ##
+  water_body_hmd,
+  water_body_typology,
+  operational_catchment,
+  opcat_id,
+  operational_catchment_alt,
+  management_catchment,
+  mancat_id,
+  management_catchment_alt,
+  ea_area_name,
+  river_basin_district,
+  rbd_id,
+  country,
+  ##
   eastings,
   northings,
   phyto_lf,
@@ -584,7 +849,7 @@ df_phyto %>% #names()
   ) %>% 
   # rename for consistency
   dplyr::rename(
-    region = river_basi,
+    # region = river_basin_district,
     wb = wb_name,
     site_name = site_station_name,
     biosys_short = biosys_code_short,
@@ -601,7 +866,25 @@ df_phyto %>% #names()
     ) %>%
   ## reorder columns to match
   dplyr::select(
-    sample_id,region,wb_id,wb,wb_type,
+    sample_id,
+    # region,
+    wb_id,
+    wb,
+    wb_type,
+    ##
+    water_body_hmd,
+    water_body_typology,
+    operational_catchment,
+    opcat_id,
+    operational_catchment_alt,
+    management_catchment,
+    mancat_id,
+    management_catchment_alt,
+    ea_area_name,
+    river_basin_district,
+    rbd_id,
+    country,
+    ##
     eastings,
     northings,biosys_short,
     site_name,
@@ -651,7 +934,9 @@ tictoc::tic("Format joined data")
 print("DO ALL NAMES MATCH?");table(names(zooptrm) == names(phytotrm))
 
 # Join to a single df & format ----
-df_all <- rbind(phytotrm, zooptrm)
+# Check whether the column names are identical
+identical(names(phytotrm), names(zooptrm))
+df_all <- dplyr::bind_rows(phytotrm, zooptrm)
 
 ## Quick tidy
 rm(df_phyto, df_zoop, phytotrm, zooptrm, zoop_meta, df_phyto0_old)
@@ -706,56 +991,107 @@ tictoc::toc(log = TRUE)
 
 #= Assign label region names for WBs ----
 tictoc::tic("Factorise regions & WBs")
+# df_all %>% 
+#   # homogenise RBD names
+#   mutate(region = case_when(
+#     region == "Anglian" ~ "Anglian",
+#     region == "Humber" ~ "Humber",
+#     region == "NEast" ~ "Northumbria",
+#     region == "North West" ~ "North West",
+#     region == "Northumbria" ~ "Northumbria",
+#     region == "NWest" ~ "North West",
+#     region == "Severn" ~ "Severn",
+#     region == "Solway Tweed" ~ "Solway Tweed",
+#     region == "South East" ~ "South East",
+#     region == "South West" ~ "South West",
+#     region == "Southern" ~ "South East",
+#     region == "SWest" ~ "South West",
+#     region == "Thames" ~ "Thames",
+#     TRUE ~ NA_character_
+#   ))  %>% 
+#   mutate(
+#     region = factor(region, levels = c(
+#       "Northumbria","Humber", "Anglian",
+#       "Thames","South East","South West",
+#       "Severn","North West","Solway Tweed"
+#       )
+#       )
+#     ) %>% 
+#   dplyr::mutate(
+#     region_lab = case_when(
+#       region == "North West" ~ "NW",
+#       region == "Anglian" ~ "Ang",
+#       region == "South East" ~ "SE",
+#       region == "Thames" ~ "Thm",
+#       region == "South West" ~ "SW",
+#       region == "Northumbria" ~ "Nmb",
+#       region == "Solway Tweed" ~ "SolTw",
+#       region == "Humber" ~ "Hmb",
+#       region == "Severn" ~ "Sev",
+#       TRUE ~ NA_character_
+#       )
+#     ) %>% 
+#   dplyr::mutate(
+#     region_lab = factor(region_lab,
+#                         levels = c(
+#                           "Nmb", "Hmb", "Ang",
+#                           "Thm", "SE", "SW",
+#                           "Sev", "NW", "SolTw"
+#                           )
+#                         )) -> df_all
+
 df_all %>% 
-  # homogenise RBD names
-  mutate(region = case_when(
-    region == "Anglian" ~ "Anglian",
-    region == "Humber" ~ "Humber",
-    region == "NEast" ~ "Northumbria",
-    region == "North West" ~ "North West",
-    region == "Northumbria" ~ "Northumbria",
-    region == "NWest" ~ "North West",
-    region == "Severn" ~ "Severn",
-    region == "Solway Tweed" ~ "Solway Tweed",
-    region == "South East" ~ "South East",
-    region == "South West" ~ "South West",
-    region == "Southern" ~ "South East",
-    region == "SWest" ~ "South West",
-    region == "Thames" ~ "Thames",
-    TRUE ~ NA_character_
-  ))  %>% 
+ # put RBDs in order
   mutate(
-    region = factor(region, levels = c(
-      "Northumbria","Humber", "Anglian",
-      "Thames","South East","South West",
-      "Severn","North West","Solway Tweed"
-      )
-      )
-    ) %>% 
+    river_basin_district = factor(
+      river_basin_district,
+      levels = c(
+        "Northumbria",
+        "Humber",
+        "Anglian",
+        "Thames",
+        "South East",
+        "South West",
+        "Severn",
+        "Western Wales",
+        "North West",
+        "Solway Tweed",
+        "0"
+        )
+    )
+  ) %>% 
   dplyr::mutate(
-    region_lab = case_when(
-      region == "North West" ~ "NW",
-      region == "Anglian" ~ "Ang",
-      region == "South East" ~ "SE",
-      region == "Thames" ~ "Thm",
-      region == "South West" ~ "SW",
-      region == "Northumbria" ~ "Nmb",
-      region == "Solway Tweed" ~ "SolTw",
-      region == "Humber" ~ "Hmb",
-      region == "Severn" ~ "Sev",
+    rbd_lab = case_when(
+      river_basin_district == "Northumbria"~"Nmb",
+      river_basin_district == "Humber"~"Hmb",
+      river_basin_district == "Anglian"~"Ang",
+      river_basin_district == "Thames"~"Thm",
+      river_basin_district == "South East"~"SE",
+      river_basin_district == "South West"~"SW",
+      river_basin_district == "Severn"~"Sev",
+      river_basin_district == "Western Wales"~"WWal",
+      river_basin_district == "North West"~"NW",
+      river_basin_district == "Solway Tweed"~"SolTw",
+      river_basin_district == "0" ~ "Out",
       TRUE ~ NA_character_
       )
     ) %>% 
   dplyr::mutate(
-    region_lab = factor(region_lab,
+    rbd_lab = factor(rbd_lab,
                         levels = c(
                           "Nmb", "Hmb", "Ang",
                           "Thm", "SE", "SW",
-                          "Sev", "NW", "SolTw"
+                          "Sev", "WWal", "NW",
+                          "SolTw","Out"
                           )
-                        )) -> df_all
+                        )
+    ) -> df_all
 
 ## Factorise water body names by region ----
+# df_all %>%
+#   dplyr::filter(rbd_lab == "Nmb") %>% 
+#   dplyr::distinct(wb)
+
 northumbria_levels <- c(
   "Northumberland North",
   "Holy Island & Budle Bay",
@@ -769,6 +1105,10 @@ northumbria_levels <- c(
   "Tees Coastal"
   )
 
+# df_all %>%
+#   dplyr::filter(rbd_lab == "Hmb") %>% 
+#   dplyr::distinct(wb)
+
 humber_levels <- c(
   "Yorkshire North",
   "ESK (E)",
@@ -777,6 +1117,10 @@ humber_levels <- c(
   "HUMBER MIDDLE",
   "HUMBER UPPER"
   )
+
+# df_all %>%
+#   dplyr::filter(rbd_lab == "Ang") %>% 
+#   dplyr::distinct(wb)
 
 anglian_levels <- c(
   "Wash Outer",
@@ -797,6 +1141,9 @@ anglian_levels <- c(
   "GREAT OUSE"
   )
 
+# df_all %>%
+#   dplyr::filter(rbd_lab == "Thm") %>% 
+#   dplyr::distinct(wb)
 thames_levels <- c(
   "Thames Coastal North",
   "THAMES LOWER",
@@ -806,6 +1153,10 @@ thames_levels <- c(
   "SWALE",
   "Murston Lakes"
   )
+
+df_all %>%
+  dplyr::filter(rbd_lab == "SE") %>% 
+  dplyr::distinct(wb)
 
 se_levels <- c(
   "STOUR (KENT)",
@@ -836,6 +1187,10 @@ se_levels <- c(
   )
 
 
+df_all %>%
+  dplyr::filter(rbd_lab == "SW") %>% 
+  dplyr::distinct(wb)
+
 sw_levels <- c(
   "Dorset / Hampshire",
   "Weymouth Bay",
@@ -854,7 +1209,7 @@ sw_levels <- c(
   "Plymouth Sound",
   "Plymouth Coast",
   "LOOE",
-  # "Fowey",  # placeholder if appears later
+  "Fowey",  # placeholder if appears later
   "St Austell",
   "CARRICK ROADS INNER",
   "Carrick Roads Outer",
@@ -868,17 +1223,31 @@ sw_levels <- c(
   "Barnstaple Bay",
   "TAW / TORRIDGE",
   "Bridgwater Bay",
+  "AXE",
   "Bristol Channel Inner South",
   "Bristol Channel Outer South",
   "AVON",
   "POOLE HARBOUR"
   )
 
+df_all %>%
+  dplyr::filter(rbd_lab == "Sev") %>% 
+  dplyr::distinct(wb)
 severn_levels <- c(
   "SEVERN MIDDLE",
   "SEVERN UPPER",
   "BRISTOL AVON"
   )
+
+df_all %>%
+  dplyr::filter(rbd_lab == "WWal") %>% 
+  dplyr::distinct(wb)
+
+wwal_levels <- "The Skerries"
+
+df_all %>%
+  dplyr::filter(rbd_lab == "NW") %>% 
+  dplyr::distinct(wb)
 
 nw_levels <- c(
   "Solway Outer South",
@@ -893,10 +1262,18 @@ nw_levels <- c(
   "MERSEY"
   )
 
+df_all %>%
+  dplyr::filter(rbd_lab == "SolTw") %>% 
+  dplyr::distinct(wb)
+
 solway_levels <- c(
   "TWEED",
   "SOLWAY"
   )
+
+df_all %>%
+  dplyr::filter(rbd_lab == "Out") %>% 
+  dplyr::distinct(wb)
 
 ## Create a single factor across all regions to put water bodies in the 
 ## correct order across all regions
@@ -920,7 +1297,8 @@ rm(northumbria_levels,
    sw_levels,
    severn_levels,
    nw_levels,
-   solway_levels)
+   solway_levels,
+   wwal_levels)
 
 df_all <- df_all %>%
   mutate(
