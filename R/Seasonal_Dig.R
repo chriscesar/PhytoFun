@@ -2,7 +2,7 @@
 
 # Set up ----
 ## load packages & set meta ----
-ld_pkgs <- c("tidyverse","tictoc")
+ld_pkgs <- c("tidyverse","tictoc","purrr","mgcv")
 vapply(ld_pkgs, library, logical(1L),
        character.only = TRUE, logical.return = TRUE)
 rm(ld_pkgs)
@@ -13,10 +13,10 @@ source("R/helperFunctions.R")
 
 ## load GAM functions ----
 # site_peak_distance_devt
-source("https://raw.githubusercontent.com/Defra-Data-Science-Centre-of-Excellence/ES_Restoration/refs/heads/main/site_peak_distance_devt.R?token=GHSAT0AAAAAAEM5ZQ5MFWVTJVKJ5NPIQA442XILA4A")
+source("R/functions/classify_gam_smooths.R")
 
 # classify_gam_smooths
-source("https://raw.githubusercontent.com/Defra-Data-Science-Centre-of-Excellence/ES_Restoration/refs/heads/main/classify_gam_smooths.R?token=GHSAT0AAAAAAEM5ZQ5NGG3BQ6E5SAWBQ3TO2XILBPQ")
+source("https://raw.githubusercontent.com/Defra-Data-Science-Centre-of-Excellence/ES_Restoration/refs/heads/main/classify_gam_smooths.R?token=GHSAT0AAAAAAEM5ZQ5MJEBUHYU7TXEZECHU2XIWXRQ")
 
 # add_site_points_devt
 source("https://raw.githubusercontent.com/Defra-Data-Science-Centre-of-Excellence/ES_Restoration/refs/heads/main/add_site_points_devt.R?token=GHSAT0AAAAAAEM5ZQ5M4SRCQOE4MBYAP2Z62XILCXA")
@@ -98,5 +98,47 @@ df_plot %>%
   dplyr::filter(river_basin_district == "Anglian") %>%
   droplevels() %>% 
   dplyr::filter(year != 2026) %>% 
-  dplyr::filter(year > 2006) %>% 
+  dplyr::filter(year > 2006) %>%
+  dplyr::filter(year == 2021) -> tmp
   
+mod <- mgcv::gam(Diatom ~ s(yday,bs = "cr", k = 3), data = tmp)
+classify_gam_smooths(mod)
+
+
+#########
+safe_gam <- purrr::safely(
+  function(data) {
+    mgcv::gam(
+      Diatom ~ s(yday, bs = "cr", k = 3),
+      data = data
+    )
+  }
+)
+
+mods <- df_plot %>%
+  filter(
+    year != 2026,
+    year > 2006
+  ) %>%
+  droplevels() %>%
+  group_by(river_basin_district, year) %>%
+  nest() %>%
+  mutate(
+    fit = map(data, safe_gam),
+    model = map(fit, "result"),
+    error = map(fit, "error")
+  ) %>%
+  ungroup()
+
+mods <- mods %>%
+  mutate(
+    summary = map(model, ~ if (is.null(.x)) NULL else summary(.x))
+    )
+
+mods <- mods %>%
+  mutate(
+    classification = map(
+      model,
+      ~ if (is.null(.x)) NULL else classify_gam_smooths(.x)
+    )
+  )
