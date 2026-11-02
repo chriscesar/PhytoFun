@@ -140,5 +140,5 @@ mods <- mods %>%
     classification = map(
       model,
       ~ if (is.null(.x)) NULL else classify_gam_smooths(.x)
+      )
     )
-  )
