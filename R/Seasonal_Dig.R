@@ -29,53 +29,135 @@ source("R/functions/classify_gam_smooths.R")
 df0 <- readRDS("outputs/ZoopPhyto_long_USE.Rdat")
 names(df0)
 
-df0 %>% tidyr::as_tibble() %>%
-  dplyr::filter(data_set == "Phytoplankton") %>% 
+# df0 %>% tidyr::as_tibble() %>%
+#   dplyr::filter(data_set == "Phytoplankton") %>% 
+#   dplyr::mutate(
+#     yday = lubridate::yday(sample_date),
+#     year = lubridate::year(sample_date),
+#     month = lubridate::month(sample_date)
+#     ) %>% #names()
+#   dplyr::select(
+#     sample_id,river_basin_district,wb,sample_date,
+#     yday, year, month, taxon, lifeform,abundance
+#   ) %>% 
+#   
+#   # Calculate total abundance of ALL phytoplankton in each sample
+#   dplyr::group_by(
+#     sample_id, river_basin_district, wb, sample_date,
+#     yday, year, month
+#   ) %>%
+#   dplyr::mutate(
+#     Phytoplankton = sum(abundance, na.rm = TRUE)
+#   ) %>%
+#   dplyr::ungroup() %>%
+#   
+#   # Existing taxon-level aggregation
+#   dplyr::group_by(dplyr::across(
+#     -c(abundance, Phytoplankton)
+#   )) %>%
+#   # 
+#   # dplyr::group_by(dplyr::across(
+#   #   -abundance
+#   #   )
+#   #   ) %>% 
+#   dplyr::summarise(
+#     abundance = sum(abundance),
+#     .groups = "drop"
+#     ) %>% 
+#   dplyr::ungroup() %>% 
+#   dplyr::mutate(
+#     lb = case_when(
+#       stringr::str_starts(taxon, "Phaeocystis") ~ "Phaeocystis",
+#       lifeform == "Diatom" ~ "Diatom",
+#       lifeform == "Dinoflagellate" ~ "Dinoflagellate",
+#       lifeform == "Protozoa" ~ "Protozoa",
+#       TRUE ~ NA
+#     )
+#   ) %>% 
+#   dplyr::filter(!(is.na(lb))) %>% 
+#   dplyr::select(-c(taxon,lifeform)) %>% 
+#   dplyr::group_by(dplyr::across(-abundance)) %>% 
+#   dplyr::summarise(
+#     abundance = sum(abundance),
+#     .groups = "drop"
+#   ) %>%
+#   ungroup() %>% 
+#   tidyr::pivot_wider(
+#     names_from = lb,
+#     values_from = abundance,values_fill = 0
+#     ) %>% 
+#   dplyr::filter(river_basin_district != "0") %>% 
+#   dplyr::filter(river_basin_district != "Western Wales") %>% 
+#   droplevels() -> df_plot
+
+df0 %>%
+  tidyr::as_tibble() %>%
+  dplyr::filter(data_set == "Phytoplankton") %>%
   dplyr::mutate(
     yday = lubridate::yday(sample_date),
     year = lubridate::year(sample_date),
     month = lubridate::month(sample_date)
-    ) %>% #names()
+  ) %>%
   dplyr::select(
-    sample_id,river_basin_district,wb,sample_date,
-    yday, year, month, taxon, lifeform,abundance
-  ) %>% 
-  dplyr::group_by(dplyr::across(
-    -abundance
-    )
-    ) %>% 
-  dplyr::summarise(
-    abundance = sum(abundance),
-    .groups = "drop"
-    ) %>% 
-  dplyr::ungroup() %>% 
+    sample_id, river_basin_district, wb, sample_date,
+    yday, year, month, taxon, lifeform, abundance
+  ) %>%
+  
+  # Calculate total abundance of ALL phytoplankton in each sample
+  dplyr::group_by(
+    sample_id, river_basin_district, wb, sample_date,
+    yday, year, month
+  ) %>%
   dplyr::mutate(
-    lb = case_when(
+    Phytoplankton = sum(abundance, na.rm = TRUE)
+  ) %>%
+  dplyr::ungroup() %>%
+  
+  # Existing taxon-level aggregation
+  dplyr::group_by(dplyr::across(
+    -c(abundance, Phytoplankton)
+  )) %>%
+  dplyr::summarise(
+    abundance = sum(abundance, na.rm = TRUE),
+    Phytoplankton = dplyr::first(Phytoplankton),
+    .groups = "drop"
+  ) %>%
+  
+  dplyr::mutate(
+    lb = dplyr::case_when(
       stringr::str_starts(taxon, "Phaeocystis") ~ "Phaeocystis",
       lifeform == "Diatom" ~ "Diatom",
       lifeform == "Dinoflagellate" ~ "Dinoflagellate",
       lifeform == "Protozoa" ~ "Protozoa",
-      TRUE ~ NA
+      TRUE ~ NA_character_
     )
-  ) %>% 
-  dplyr::filter(!(is.na(lb))) %>% 
-  dplyr::select(-c(taxon,lifeform)) %>% 
-  dplyr::group_by(dplyr::across(-abundance)) %>% 
+  ) %>%
+  dplyr::filter(!is.na(lb)) %>%
+  dplyr::select(-c(taxon, lifeform)) %>%
+  
+  dplyr::group_by(dplyr::across(
+    -c(abundance, Phytoplankton)
+  )) %>%
   dplyr::summarise(
-    abundance = sum(abundance),
+    abundance = sum(abundance, na.rm = TRUE),
+    Phytoplankton = dplyr::first(Phytoplankton),
     .groups = "drop"
   ) %>%
-  ungroup() %>% 
+  
   tidyr::pivot_wider(
     names_from = lb,
-    values_from = abundance,values_fill = 0
-    ) %>% 
-  dplyr::filter(river_basin_district != "0") %>% 
-  dplyr::filter(river_basin_district != "Western Wales") %>% 
+    values_from = abundance,
+    values_fill = 0
+  ) %>%
+  dplyr::filter(
+    river_basin_district != "0",
+    river_basin_district != "Western Wales"
+  ) %>%
   droplevels() -> df_plot
 
 # generate data & model summaries ----
 in_var <- c(
+  "Phytoplankton",
   "Diatom",
   "Dinoflagellate",
   "Phaeocystis",
@@ -258,7 +340,18 @@ dat <- mods %>%
     max_val != 0
   ) %>% 
   dplyr::mutate(season = seas::mkseas(max_date,width = "DJF")) %>% 
-  dplyr::mutate(yday = lubridate::yday(max_date))
+  dplyr::mutate(yday = lubridate::yday(max_date)) %>% 
+  dplyr::mutate(taxon = dplyr::case_when(
+    taxon == "Phytoplankton" ~ "PHYTOPLANKTON",
+    taxon != "Phytoplankton" ~ taxon
+  )) %>% 
+  dplyr::mutate(taxon = factor(taxon, levels = c(
+    "PHYTOPLANKTON",
+    "Diatom",
+    "Dinoflagellate",
+    "Phaeocystis",
+    "Protozoa"
+  )))
 
 # dat %>% 
 #   ggplot2::ggplot(.,
@@ -280,8 +373,8 @@ dat %>%
   dplyr::filter(river_basin_district != "Severn") %>% 
   
   ggplot(., aes(x = year,
-                # y= yday,
-                y= gam_peak_yday,
+                y= yday,
+                # y= gam_peak_yday,
                 )) +
   ## add season rectangles
   # # spring (MAM)
@@ -332,7 +425,7 @@ dat %>%
     show.legend = FALSE
     ) +
   geom_smooth(
-    method = "gam",linewidth = 2,
+    method = "gam",linewidth = 1.5,
     formula = y ~ s(x, k = 6),
     se = FALSE
   ) +
@@ -348,14 +441,28 @@ dat %>%
   theme(
     plot.title = element_text(face = 2),
     strip.text = element_text(face = 2),
-    axis.text = element_text(face = 2),
+    axis.title.x = element_blank(),
+    axis.text.y = element_text(face = 2),
+    axis.text.x = element_text(face = 2, size = 12),
     axis.title = element_text(face = 2),
     )
+
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_annual_maximum_timing_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
 
 ### heatmap ----
 dat %>% 
   dplyr::filter(year>2006) %>% 
-  ggplot(., aes(year, taxon, fill = yday)) +
+  ggplot(., aes(
+    x = year,
+    y = forcats::fct_rev(taxon),
+    fill = yday
+    )
+    ) +
   geom_tile() +
   facet_wrap(~ river_basin_district, ncol = 1) +
   scale_fill_viridis_c(
@@ -373,6 +480,13 @@ dat %>%
     axis.text = element_text(face = 2),
     axis.title = element_text(face = 2),
   )
+
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_peak_timing_heatmap_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
 
 ### change relative to baseline ----
 dat |>
@@ -405,12 +519,20 @@ dat |>
     plot.title = element_text(face = 2,size = 14),
     plot.subtitle = element_text(face = 2,size = 12),
     plot.caption = element_text(face = 2, size = 11),
-    strip.text = element_text(face = 2, size=14),
+    strip.text.x = element_text(face = 2, size=12),
+    strip.text.y = element_text(face = 2, size=9),
     # strip.text.y.right = element_text(face = 2, size=14),
     axis.text = element_text(face = 2, size = 11),
     axis.title.y = element_text(face = 2,size = 12),
     axis.title.x = element_blank(),
   )
+
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_peak_timing_anomalies_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
 
 ### days per decade ----
 
@@ -424,14 +546,25 @@ trends <- dat |>
   mutate(days_per_decade = estimate * 10)
 
 ### Combine distribution and temporal trend ----
-ggplot(dat, aes(taxon, yday, colour = river_basin_district)) +
+ggplot(dat, aes(forcats::fct_rev(taxon), yday, colour = river_basin_district)) +
   geom_boxplot() +
   coord_flip() +
   labs(
     x = NULL,
     y = "Day of annual maximum"
   ) +
-  theme_bw()
+  theme_bw() +
+  theme(
+    plot.title = element_text(face = 2,size = 14),
+    plot.subtitle = element_text(face = 2,size = 12),
+    plot.caption = element_text(face = 2, size = 11),
+    strip.text = element_text(face = 2, size=13),
+    # strip.text.y.right = element_text(face = 2, size=14),
+    axis.text = element_text(face = 2, size = 11),
+    axis.title.y = element_text(face = 2,size = 12),
+    axis.title.x = element_blank(),
+    legend.title = element_blank(),
+  )
 
 ######
 # RECOMMENDED(?) ----
@@ -446,7 +579,7 @@ plot_dat <- dat %>%
   ) %>%
   mutate(
     year = as.integer(year),
-    taxon = factor(taxon,levels = c("Diatom","Dinoflagellate","Phaeocystis","Protozoa")),
+    taxon = factor(taxon,levels = c("PHYTOPLANKTON","Diatom","Dinoflagellate","Phaeocystis","Protozoa")),
     river_basin_district = factor(river_basin_district)
   )
 
@@ -512,7 +645,7 @@ month_labels <- month.abb
       # angle = 45,
       hjust = 0.5,
       face=2,
-      size = 14
+      size = 11
     ),
     axis.text.y = element_text(
       face=2
@@ -524,9 +657,15 @@ month_labels <- month.abb
     plot.title.position = "plot"
   ))
 
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_peak_timing_distribution_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
+
 (fig1_horizontal <- fig1 +
   coord_flip())
-
 
 
 ## fig 2 ----
@@ -570,7 +709,7 @@ month_labels <- month.abb
   labs(
     title = "Annual phytoplankton peak timing through time",
     subtitle = paste(
-      "Points are annual GAM-derived maxima;",
+      "Points are observed annual phytoplankton maxima;",
       "lines and ribbons show temporal smooths and 95% confidence intervals"
     ),
     x = "Year",
@@ -580,26 +719,36 @@ month_labels <- month.abb
   theme(
     plot.title = element_text(face=2),
     plot.subtitle = element_text(face=2),
-    axis.text = element_text(face=2),
-    axis.title = element_text(face=2),
+    axis.text = element_text(face=2, size = 11),
+    axis.title.y = element_text(face=2,size = 13),
+    axis.title.x = element_blank(),
     panel.grid.minor = element_blank(),
     strip.background = element_rect(fill = "grey92"),
     strip.text.x = element_text(
       face=2,
-      hjust = 0.5
+      hjust = 0.5,
+      size = 13,
     ),
     strip.text.y = element_text(
-      angle = 0,
+      angle = 90*3,
+      size = 10,
       face = "bold"
     ),
     plot.title.position = "plot"
   ))
 
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_peak_timing_trends_gam_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
+
 #### fig 2 - linear ----
 (fig2_linear <- ggplot(
   plot_dat,
   aes(x = year, y = yday)
-) +
+  ) +
   geom_point(
     aes(colour = taxon),
     alpha = 0.65,
@@ -628,8 +777,11 @@ month_labels <- month.abb
     limits = c(1, 366)
   ) +
   labs(
-    title = "Linear change in annual phytoplankton peak timing",
-    subtitle = "Lines and ribbons show linear trends and 95% confidence intervals",
+    title = "Annual phytoplankton peak timing through time",
+    subtitle = paste(
+      "Points are observed annual phytoplankton maxima;",
+      "lines and ribbons show linear trends and 95% confidence intervals"
+      ),
     x = "Year",
     y = "Timing of annual maximum"
   ) +
@@ -637,20 +789,30 @@ month_labels <- month.abb
   theme(
     plot.title = element_text(face=2),
     plot.subtitle = element_text(face=2),
-    axis.text = element_text(face=2),
-    axis.title = element_text(face=2),
+    axis.text = element_text(face=2, size = 11),
+    axis.title.y = element_text(face=2,size = 13),
+    axis.title.x = element_blank(),
     panel.grid.minor = element_blank(),
     strip.background = element_rect(fill = "grey92"),
     strip.text.x = element_text(
       face=2,
-      hjust = 0.5
+      hjust = 0.5,
+      size = 13,
     ),
     strip.text.y = element_text(
-      angle = 0,
+      angle = 90*3,
+      size = 10,
       face = "bold"
     ),
     plot.title.position = "plot"
   ))
+
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_peak_timing_trends_linear_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
 
 ## fig 3 - Estimated change in peak timing ----
 # Fit a linear time trend to each taxon x RBD group -----------------------
@@ -733,10 +895,33 @@ trend_estimates <- plot_dat %>%
   ) +
   theme_bw(base_size = 11) +
   theme(
+    legend.position = "bottom",
+    legend.text = element_text(face=2),
+    legend.title = element_text(face=2),
+    plot.title = element_text(face=2),
+    plot.subtitle = element_text(face=2),
+    axis.text = element_text(face=2, size = 11),
+    axis.title.y = element_text(face=2,size = 13),
+    axis.title.x = element_blank(),
     panel.grid.minor = element_blank(),
     panel.grid.major.y = element_blank(),
     strip.background = element_rect(fill = "grey92"),
-    strip.text = element_text(face = "bold"),
-    legend.position = "bottom",
+    strip.text.x = element_text(
+      face=2,
+      hjust = 0.5,
+      size = 13,
+      ),
+    strip.text.y = element_text(
+      angle = 90*3,
+      size = 12,
+      face = "bold"
+      ),
     plot.title.position = "plot"
-  ))
+    ))
+
+ggsave(plot = get_last_plot(),
+       filename = paste0(output,
+                         "202611_Phenology/",
+                         "phyto_peak_timing_trends_per_decade_by_rbd.png"),
+       width = 18, height = 8, units = "in"
+       )
